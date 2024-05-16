@@ -1,0 +1,39 @@
+[project]
+name = "nodc-statistics"
+version = "2024.1"
+description = "Statistics for NODC"
+authors = [
+    {name = "Jonatan Skogsfors", email = "jonatan.skogsfors@smhi.se"},
+]
+dependencies = []
+requires-python = ">=3.9"
+readme = "README.md"
+license = {file = "LICENSE"}
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+[tool.pdm]
+distribution = true
+
+[tool.pdm.dev-dependencies]
+dev = [
+    "pytest>=8.1.1",
+    "ruff>=0.3.4",
+    "pre-commit>=3.7.0",
+]
+
+[tool.ruff]
+line-length = 90
+indent-width = 4
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["F", "E", "W", "I001"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
