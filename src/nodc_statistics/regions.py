@@ -7,19 +7,21 @@ import os
 from pathlib import Path
 import functools
 
-GEOPACKAGE_PATH = Path(__file__).parent / "data" / "SVAR2022_HELCOM_OSPAR.gpkg"
-
 GEOLAYERS_AREATAG = {"typomrkust": "TYPOMRKUST", "Skagerrak_without_coast": "NAMN", "helcom_subbasins_with_coastal_and_offshore_division_2022_level3": "level_34"}
 
 
 # @functools.cache
 # cache needs all argumetns to be hashable, GeoDataFrame is not
 def sea_basin_for_position(longitude, latitude, geo_info = None):
+    if not all((-180 <= longitude <= 180, -90 <= latitude <= 90)):
+        raise ValueError(f"latitude or longitude out of range.\nGiven latitude is: {latitude}\nGiven longitude is: {longitude}")
     point = pd.DataFrame({"LONGI_DD": [longitude], "LATIT_DD": [latitude]})
+
     if not isinstance(geo_info, gpd.GeoDataFrame):
-        print("readin again")
+        print("reading again in regions.sea_basin_for_position")
         geo_info = read_geo_info_file(os.environ["QCTOOL_GEOPACKAGE"])
     area_tag_df = get_area_tags(df=point, geo_info=geo_info)
+
     if len(area_tag_df["area_tag"].values) == 1:
         return area_tag_df["area_tag"].values[0]
     else:
