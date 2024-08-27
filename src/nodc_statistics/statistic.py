@@ -12,15 +12,6 @@ from nodc_statistics import calculate_parameter
 statistics_directory = Path(__file__).parent / "data" / "statistics"
 STATISTIC_FILES = {path.stem: path for path in statistics_directory.glob('*') if path.is_file()}
 
-{
-    "Skagerrak": Path(__file__).parent / "data" / "skagerrak.csv",
-    "Kattegat": Path(__file__).parent / "data" / "kattegat.csv",
-    "Baltic Sea": Path(__file__).parent / "data" / "baltic_sea.csv",
-    "1n": Path(__file__).parent / "data" / "1n.csv",
-    "2": Path(__file__).parent / "data" / "2.csv",
-    "3": Path(__file__).parent / "data" / "3.csv"
-}
-
 SETTING_FILE = {
     'settings': Path(__file__).parent / "data" / "settings.json",
 }
@@ -47,6 +38,20 @@ def nan_float(value: str):
         return np.nan
 
 class DataHandler:
+    """
+    DataHandler(data_path = "/sharkdata.txt") -> DataHandler object 
+    Reads data from sharkweb downloaded to given path.
+    Maps sampling depths that are outside standard depths to standard depths
+    Adds columns:
+        - timestamp
+        - month
+        - year
+        - salt
+        - temp
+        - doxy
+        - depth (DEPH mapped to standard depths)
+    self.data contaings a pandas dataframe with the data
+    """
 
     def __init__(self, data_path):
         super().__init__()
@@ -57,7 +62,7 @@ class DataHandler:
 
     def _read_shark_data(self, filepath: str):
         """read text file from sharkweb"""
-        
+
         file_path = Path(filepath)
         print(f"reading file {file_path}\n... ... ...")
         df = pd.read_csv(open(file_path, encoding='utf-8'),
@@ -67,7 +72,7 @@ class DataHandler:
         df['year'] = df['timestamp'].apply(lambda x: x.year)
 
         return df
-    
+
     def _add_parameters(self):
         self.data.loc[:, "doxy"] = self.data.copy().apply(
             lambda row: calculate_parameter.get_prio_par_oxy(row.DOXY_BTL, row.DOXY_CTD, row.Q_DOXY_BTL, row.Q_DOXY_CTD), axis=1
@@ -126,8 +131,11 @@ class CalculateStatistics:
 
         return self.data['area_tag'] == area
 
-    def profile_statistics(self):
-
+    def profile_statistics(self, save = True):
+        """
+        Calculate statistics for standard depths by month and sea basin
+        Saves results to statistic library
+        """
         # Definiera aggregeringsfunktioner och deras namn
         agg_funcs = {
             'mean': 'mean',
@@ -161,7 +169,8 @@ class CalculateStatistics:
         
         # Återställ index för att få en platt DataFrame
         grouped = grouped.reset_index().round(3)
-        self._save_statistic_files(grouped)
+        if save:
+            self._save_statistic_files(grouped)
 
     def _save_statistic_files(self, data, column_name='area_tag', file_format='csv'):
         # Grupper DataFrame efter `area_tag`
@@ -182,10 +191,17 @@ def get_profile_statistics_for_parameter_and_position(
 ):
     sea_basin = regions.sea_basin_for_position(longitude, latitude)
 
+    return get_profile_statistics_for_parameter_and_sea_basin(parameter, sea_basin, point_in_time)
+
+@functools.cache
+def get_profile_statistics_for_parameter_and_sea_basin(
+    parameter: str, sea_basin: str, point_in_time: datetime.datetime
+):
+
     try:
         statistic_path = STATISTIC_FILES[sea_basin]
     except KeyError:
-        print(f'no basin named {sea_basin} {parameter, longitude, latitude}')
+        print(f'no basin named {sea_basin} {parameter}')
         return {
         "mean": [np.nan],
         "lower_limit": [np.nan

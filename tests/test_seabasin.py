@@ -30,7 +30,7 @@ def test_get_correct_sea_basin_for_position(
     assert sea_basin == expected_sea_basin
 
 @pytest.mark.parametrize(
-    "given_path", (("C:/LenaV/code/w_qc-tool/nodc-statistics/src/nodc_statistics/data/SVAR2022_HELCOM_OSPAR.gpkg",))
+    "given_path", ((os.environ["QCTOOL_GEOPACKAGE"],))
     )
 def test_read_geopackage_to_geodataframe(given_path):
 

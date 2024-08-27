@@ -12,10 +12,14 @@ GEOPACKAGE_PATH = Path(__file__).parent / "data" / "SVAR2022_HELCOM_OSPAR.gpkg"
 GEOLAYERS_AREATAG = {"typomrkust": "TYPOMRKUST", "Skagerrak_without_coast": "NAMN", "helcom_subbasins_with_coastal_and_offshore_division_2022_level3": "level_34"}
 
 
-@functools.cache
-def sea_basin_for_position(longitude, latitude):
+# @functools.cache
+# cache needs all argumetns to be hashable, GeoDataFrame is not
+def sea_basin_for_position(longitude, latitude, geo_info = None):
     point = pd.DataFrame({"LONGI_DD": [longitude], "LATIT_DD": [latitude]})
-    area_tag_df = get_area_tags(df=point)
+    if not isinstance(geo_info, gpd.GeoDataFrame):
+        print("readin again")
+        geo_info = read_geo_info_file(os.environ["QCTOOL_GEOPACKAGE"])
+    area_tag_df = get_area_tags(df=point, geo_info=geo_info)
     if len(area_tag_df["area_tag"].values) == 1:
         return area_tag_df["area_tag"].values[0]
     else:
@@ -46,8 +50,7 @@ def read_geo_info_file(filepath: str):
 
     return geo_info
 
-def get_area_tags(df):
-    geo_info = read_geo_info_file(GEOPACKAGE_PATH)
+def get_area_tags(df, geo_info: gpd.GeoDataFrame):
     """
     Hitta rätt "area_tag" för varje punkt i DataFrame df genom en rumslig join med geo_info.
     Returnera en DataFrame med kolumnerna "area_tag", "LONGI_DD" och "LATIT_DD".
@@ -61,7 +64,7 @@ def get_area_tags(df):
         points = points.to_crs(geo_info.crs)
 
     # Använd geopandas sjoin för att göra en rumslig join mellan punkterna och polygonerna i geo_info
-    # med innen kommer endast de punkter som har en match i geo_info med
+    # med inner kommer endast de punkter som har en match i geo_info med
     joined = gpd.sjoin(points, geo_info, how="inner", predicate="within")
 
     # Lägg till "LONGI_DD" och "LATIT_DD" från points till joined

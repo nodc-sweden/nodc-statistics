@@ -22,14 +22,15 @@ def get_prio_par(prio1_par, prio2_par, q_prio1_par='', q_prio2_par=''):
         return prio2_par
     else:
         return np.nan
-    
+
 def get_allowed_depth_interval(deph, standard_depths):
 
     """
     Sätt spann för djup nära standarddjupen. 
     Mindre spann i ytan och större spann ju djupare vi kommer
     """
-    
+    # TODO: use basin specific standard depths (Skagerrak and Kattegat differs from the Baltic)
+
     # grunda djup
     if deph < 20:
         if deph < 2.5:
@@ -49,6 +50,11 @@ def get_allowed_depth_interval(deph, standard_depths):
         return deph - 49.999, deph + 50
 
 def map_to_standard_depth(data, standard_depths: dict):
+    """
+    maps sample depths in DEPH column to standard depths as defined by 
+    get_allowed_depth_interval
+    mapped standard depths are stored in column depth
+    """
 
     data['depth'] = data['DEPH']
     for depth in standard_depths:
