@@ -246,7 +246,7 @@ def get_profile_statistics_for_parameter_and_sea_basin(
 
     try:
         filtered_df[f"{parameter}:mean"]
-        std_values = filtered_df[f"{parameter}:std"].apply(nan_float).tolist()
+        std_values = filtered_df[f"{parameter}:std"]
     except KeyError:
         print(f"no {parameter} for {sea_basin} ")
         return {

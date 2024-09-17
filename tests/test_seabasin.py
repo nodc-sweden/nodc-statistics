@@ -1,9 +1,8 @@
-import pytest
-
-from nodc_statistics import regions
-import geopandas as gpd
-from pathlib import Path
 import os
+
+import geopandas as gpd
+import pytest
+from nodc_statistics import regions
 
 """
 För att köra tester: 
