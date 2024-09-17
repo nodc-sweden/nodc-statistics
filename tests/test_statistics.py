@@ -1,7 +1,7 @@
 import datetime
+
 import numpy as np
 import pytest
-
 from nodc_statistics import statistic
 
 
@@ -19,6 +19,40 @@ def test_get_profile_statistics_for_parameter_returns_dictionary():
     # When retrieving statistics
     statistics_object = statistic.get_profile_statistics_for_parameter_and_position(
         given_parameter, given_longitude, given_latitude, given_datetime
+    )
+
+    # Then a dictionary is returned
+    assert isinstance(statistics_object, dict)
+
+
+def test_get_profile_statistics_for_nonexistent_sea_basin():
+    given_sea_basin = "incorrect_basin_name"
+
+    given_parameter = "DOXY_CTD"
+
+    # Given a datetime
+    given_datetime = datetime.datetime(2024, 5, 16, 9, 32)
+
+    # When retrieving statistics
+    statistics_object = statistic.get_profile_statistics_for_parameter_and_sea_basin(
+        given_parameter, given_sea_basin, given_datetime
+    )
+
+    # Then a dictionary is returned
+    assert isinstance(statistics_object, dict)
+
+
+def test_get_profile_statistics_for_nonexistent_parameter():
+    given_sea_basin = "Skagerrak"
+
+    given_parameter = "unknown_param"
+
+    # Given a datetime
+    given_datetime = datetime.datetime(2024, 5, 16, 9, 32)
+
+    # When retrieving statistics
+    statistics_object = statistic.get_profile_statistics_for_parameter_and_sea_basin(
+        given_parameter, given_sea_basin, given_datetime
     )
 
     # Then a dictionary is returned
@@ -54,7 +88,7 @@ def test_profile_statistics_object_has_mean_lower_limit_and_upper_limit():
     assert isinstance(statistics_object["upper_limit"], list)
 
     assert "depth" in statistics_object
-    assert  isinstance(statistics_object["depth"], list)
+    assert isinstance(statistics_object["depth"], list)
 
 
 @pytest.mark.parametrize(
@@ -64,7 +98,6 @@ def test_profile_statistics_object_has_mean_lower_limit_and_upper_limit():
         ("DOXY_CTD", 58.3050, 10.759, datetime.datetime(2024, 5, 16), (2, 11)),
     ),
 )
-
 def test_mean_values_in_expected_range(
     given_parameter, given_latitude, given_longitude, given_datetime, expected_range
 ):
@@ -73,7 +106,11 @@ def test_mean_values_in_expected_range(
     )
     lower_bound, upper_bound = expected_range
     assert statistics_object["mean"]
-    assert all(lower_bound < value < upper_bound for value in statistics_object["mean"] if ~np.isnan(value))
+    assert all(
+        lower_bound < value < upper_bound
+        for value in statistics_object["mean"]
+        if ~np.isnan(value)
+    )
 
 
 @pytest.mark.parametrize(
@@ -99,9 +136,10 @@ def test_mean_is_between_lower_and_upper_limit(
         statistics_object["upper_limit"],
     ):
         if not np.isnan(mean_value):
-            assert lower_limit <= mean_value <= upper_limit, (
-                f"Mean value {mean_value} is not between lower limit {lower_limit} and upper limit {upper_limit}"
-            )
+            assert (
+                lower_limit <= mean_value <= upper_limit
+            ), f"Mean value {mean_value} is not between lower limit {lower_limit} and upper limit {upper_limit}"
+
 
 @pytest.mark.parametrize(
     "given_latitude, given_longitude",

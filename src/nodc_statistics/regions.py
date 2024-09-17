@@ -1,20 +1,24 @@
+import os
 import time
+from pathlib import Path
+
 import geopandas as gpd
 import pandas as pd
-from shapely.geometry import Point
-import sys
-import os
-from pathlib import Path
-import functools
 
-GEOLAYERS_AREATAG = {"typomrkust": "TYPOMRKUST", "Skagerrak_without_coast": "NAMN", "helcom_subbasins_with_coastal_and_offshore_division_2022_level3": "level_34"}
+GEOLAYERS_AREATAG = {
+    "typomrkust": "TYPOMRKUST",
+    "Skagerrak_without_coast": "NAMN",
+    "helcom_subbasins_with_coastal_and_offshore_division_2022_level3": "level_34",
+}
 
 
 # @functools.cache
 # cache needs all argumetns to be hashable, GeoDataFrame is not
-def sea_basin_for_position(longitude, latitude, geo_info = None):
+def sea_basin_for_position(longitude, latitude, geo_info=None):
     if not all((-180 <= longitude <= 180, -90 <= latitude <= 90)):
-        raise ValueError(f"latitude or longitude out of range.\nGiven latitude is: {latitude}\nGiven longitude is: {longitude}")
+        raise ValueError(
+            f"latitude or longitude out of range.\nGiven latitude is: {latitude}\nGiven longitude is: {longitude}"
+        )
     point = pd.DataFrame({"LONGI_DD": [longitude], "LATIT_DD": [latitude]})
 
     if not isinstance(geo_info, gpd.GeoDataFrame):
@@ -27,6 +31,7 @@ def sea_basin_for_position(longitude, latitude, geo_info = None):
     else:
         print(f'to many area_tag results {area_tag_df["area_tag"]}')
         return area_tag_df["area_tag"].values[0]
+
 
 def read_geo_info_file(filepath: str):
     """
@@ -52,13 +57,16 @@ def read_geo_info_file(filepath: str):
 
     return geo_info
 
+
 def get_area_tags(df, geo_info: gpd.GeoDataFrame):
     """
     Hitta rätt "area_tag" för varje punkt i DataFrame df genom en rumslig join med geo_info.
     Returnera en DataFrame med kolumnerna "area_tag", "LONGI_DD" och "LATIT_DD".
     """
     # Skapa en geopandas GeoDataFrame med punkter från df
-    points = gpd.GeoDataFrame(geometry=gpd.points_from_xy(df["LONGI_DD"], df["LATIT_DD"]), crs="EPSG:4326")
+    points = gpd.GeoDataFrame(
+        geometry=gpd.points_from_xy(df["LONGI_DD"], df["LATIT_DD"]), crs="EPSG:4326"
+    )
 
     # Kontrollera om CRS för geo_info matchar punkternas CRS
     if geo_info.crs != points.crs:
@@ -74,18 +82,22 @@ def get_area_tags(df, geo_info: gpd.GeoDataFrame):
     joined["LATIT_DD"] = df["LATIT_DD"]
 
     # Kontrollera om det finns flera matchningar för samma punkt
-    duplicate_check = joined.groupby(["LONGI_DD", "LATIT_DD"]).agg(
-        count_areatags=('area_tag', pd.Series.nunique),
-        unique_areatags=('area_tag', 'unique')
-    ).reset_index()
-    multiple_matches = duplicate_check[duplicate_check['count_areatags'] > 1]
+    duplicate_check = (
+        joined.groupby(["LONGI_DD", "LATIT_DD"])
+        .agg(
+            count_areatags=("area_tag", pd.Series.nunique),
+            unique_areatags=("area_tag", "unique"),
+        )
+        .reset_index()
+    )
+    multiple_matches = duplicate_check[duplicate_check["count_areatags"] > 1]
 
     if not multiple_matches.empty:
         print("Varning: Följande punkter har flera matchande polygoner:")
         print(multiple_matches)
-        raise ValueError('punkt matchar mot flera områden')
+        raise ValueError("punkt matchar mot flera områden")
         # Hantera flera matchningar, t.ex. genom att välja den första matchningen
-        joined = joined.drop_duplicates(subset=["LONGI_DD", "LATIT_DD"], keep='first')
+        joined = joined.drop_duplicates(subset=["LONGI_DD", "LATIT_DD"], keep="first")
 
     # Välj önskade kolumner och returnera som en DataFrame
     if not joined.empty:
@@ -95,7 +107,8 @@ def get_area_tags(df, geo_info: gpd.GeoDataFrame):
         # Om inga matchningar hittades, returnera en tom DataFrame med rätt kolumner
         return pd.DataFrame(columns=["area_tag", "LONGI_DD", "LATIT_DD"])
 
-def save_area_tag_files(data, column_name='area_tag', file_format='csv'):
+
+def save_area_tag_files(data, column_name="area_tag", file_format="csv"):
     # Gruppér DataFrame efter `area_tag`
     grouped = data.groupby(column_name)
 
@@ -107,14 +120,33 @@ def save_area_tag_files(data, column_name='area_tag', file_format='csv'):
         # Spara gruppen till en fil
         group.to_csv(file_name, index=False)
 
-if __name__ == "__main__":
-    save_kwargs = {"sep": "\t", "encoding": "utf-8", "index": False, "float_format": "%.2f"}
 
-    df = pd.read_csv(open("src/nodc_statistics/data/sharkweb_all_data_1991-2020_Physical and Chemical_1991-2020.csv", encoding="utf-8"), sep="\t")
+if __name__ == "__main__":
+    save_kwargs = {
+        "sep": "\t",
+        "encoding": "utf-8",
+        "index": False,
+        "float_format": "%.2f",
+    }
+
+    df = pd.read_csv(
+        open(
+            "src/nodc_statistics/data/sharkweb_all_data_1991-2020_Physical and Chemical_1991-2020.csv",
+            encoding="utf-8",
+        ),
+        sep="\t",
+    )
 
     area_tags = get_area_tags(df)
     area_tags.drop_duplicates(inplace=True)
-    area_tags['pos_string'] = area_tags['LONGI_DD'].astype(str) + '_' + area_tags['LATIT_DD'].astype(str)
+    area_tags["pos_string"] = (
+        area_tags["LONGI_DD"].astype(str) + "_" + area_tags["LATIT_DD"].astype(str)
+    )
 
-    area_tags.to_csv("src/nodc_statistics/data/pos_area_tag_1991_2020.csv", sep="\t", index=False, encoding="utf-8")
+    area_tags.to_csv(
+        "src/nodc_statistics/data/pos_area_tag_1991_2020.csv",
+        sep="\t",
+        index=False,
+        encoding="utf-8",
+    )
     print(area_tags.head())
