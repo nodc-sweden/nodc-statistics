@@ -20,6 +20,8 @@ pytest {sökväga till specifik testfil}
         (65.27, 23.40, "Bothnian Bay"),
         (59.93, 27.43, "Gulf of Finland"),
         (55.02, 13.3008, "Arkona Basin"),
+        (58.41, 15.61, None),  # Land position
+        (5657.20, 1122.54, None),  # Bad position format
     ),
 )
 def test_get_correct_sea_basin_for_position(
@@ -28,11 +30,9 @@ def test_get_correct_sea_basin_for_position(
     sea_basin = regions.sea_basin_for_position(given_longitude, given_latitude)
     assert sea_basin == expected_sea_basin
 
-@pytest.mark.parametrize(
-    "given_path", ((os.environ["QCTOOL_GEOPACKAGE"],))
-    )
-def test_read_geopackage_to_geodataframe(given_path):
 
+@pytest.mark.parametrize("given_path", ((os.environ["QCTOOL_GEOPACKAGE"],)))
+def test_read_geopackage_to_geodataframe(given_path):
     geo_info = regions.read_geo_info_file(given_path)
 
     assert isinstance(geo_info, gpd.GeoDataFrame)

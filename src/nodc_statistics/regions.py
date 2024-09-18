@@ -16,9 +16,7 @@ GEOLAYERS_AREATAG = {
 # cache needs all argumetns to be hashable, GeoDataFrame is not
 def sea_basin_for_position(longitude, latitude, geo_info=None):
     if not all((-180 <= longitude <= 180, -90 <= latitude <= 90)):
-        raise ValueError(
-            f"latitude or longitude out of range.\nGiven latitude is: {latitude}\nGiven longitude is: {longitude}"
-        )
+        return None
     point = pd.DataFrame({"LONGI_DD": [longitude], "LATIT_DD": [latitude]})
 
     if not isinstance(geo_info, gpd.GeoDataFrame):
@@ -26,11 +24,10 @@ def sea_basin_for_position(longitude, latitude, geo_info=None):
         geo_info = read_geo_info_file(os.environ["QCTOOL_GEOPACKAGE"])
     area_tag_df = get_area_tags(df=point, geo_info=geo_info)
 
-    if len(area_tag_df["area_tag"].values) == 1:
-        return area_tag_df["area_tag"].values[0]
-    else:
-        print(f'to many area_tag results {area_tag_df["area_tag"]}')
-        return area_tag_df["area_tag"].values[0]
+    if len(area_tag_df["area_tag"].values) > 1:
+        print(f'too many area_tag results {area_tag_df["area_tag"]}')
+    value = area_tag_df["area_tag"].values[0] or None
+    return value if not pd.isna(value) else None
 
 
 def read_geo_info_file(filepath: str):
