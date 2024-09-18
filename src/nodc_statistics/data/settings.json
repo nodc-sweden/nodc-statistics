@@ -17,7 +17,9 @@
 		"HUMUS",
 		"H2S",
 		"PH",
-		"ALKY"
+		"ALKY",
+		"NTOT",
+		"PTOT"
 	],
 	"standard_depths": [
 		0,
