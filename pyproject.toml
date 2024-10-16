@@ -6,8 +6,10 @@ authors = [
     {name = "Jonatan Skogsfors", email = "jonatan.skogsfors@smhi.se"},
     {name = "Lena Viktorsson", email = "lena.viktorsson@smhi.se"}
 ]
-dependencies = ["geopandas>=1.0.1",
-            "shapely>=2.0.6"]
+dependencies = [
+    "geopandas>=1.0.1",
+    "shapely>=2.0.6",
+]
 requires-python = ">=3.9"
 readme = "README.md"
 license = {file = "LICENSE"}
@@ -22,7 +24,7 @@ distribution = true
 [tool.pdm.dev-dependencies]
 dev = [
     "pytest>=8.1.1",
-    "ruff>=0.3.4",
+    "ruff>=0.6.9",
     "pre-commit>=3.7.0",
 ]
 

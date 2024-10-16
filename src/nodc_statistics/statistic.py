@@ -128,7 +128,9 @@ class CalculateStatistics:
         self.data["pos_string"] = self.data.apply(
             lambda row: "_".join([str(row.LONGI_DD), str(row.LATIT_DD)]), axis=1
         )
-        # self.data['area_tag'] = self.data.apply(lambda row: '_'.join([str(row[tag]) for tag in area_tags]), axis=1)
+        # self.data["area_tag"] = self.data.apply(
+        #     lambda row: "_".join([str(row[tag]) for tag in area_tags]), axis=1
+        # )
         self._map_areas_to_pos_str()
 
         self.areas = self.data["area_tag"].unique()
@@ -203,7 +205,8 @@ class CalculateStatistics:
         # Spara varje grupp i en separat fil
         for area_tag, group in grouped:
             # Skapa ett filnamn baserat på area_tag
-            # FIX: kolla varför det ligger med ett \n i "Eastern Gotland Basin Swedish Coastal waters"
+            # FIX: kolla varför det ligger med ett \n i "Eastern Gotland Basin Swedish
+            # Coastal waters"
             clean_area_tag = area_tag.replace("\n", "").strip()
             file_name = f"{clean_area_tag}.{file_format}"
             # Spara gruppen till en fil
@@ -276,7 +279,10 @@ def get_profile_statistics_for_parameter_and_sea_basin(
 
 
 if __name__ == "__main__":
-    # data = DataHandler('src/nodc_statistics/data/sharkweb_all_data_1991-2020_Physical and Chemical_1991-2020.csv')
+    # data = DataHandler(
+    #     "src/nodc_statistics/data/"
+    #     "sharkweb_all_data_1991-2020_Physical and Chemical_1991-2020.csv"
+    # )
     # statistics = CalculateStatistics(data.data)
     # statistics.profile_statistics()
 

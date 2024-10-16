@@ -1,0 +1,33 @@
+# This workflow will install Python dependencies, run tests and lint with a single version of Python
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
+
+name: Format, lint and test
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+jobs:
+  run_tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup PDM
+        uses: pdm-project/setup-pdm@v4.1
+        with:
+          python-version: 3.12
+          cache: true
+      - name: Install dependencies
+        run: pdm install
+      - name: Format check with ruff
+        run: pdm run ruff format
+      - name: Lint with ruff
+        run: pdm run ruff check
+
+# Note: as long as tests are depending on a geopackage file tests are harder to run on github. If the geopackage file
+# could be accessed over the internet, perhaps it could be downloaded (and cached) on demand.

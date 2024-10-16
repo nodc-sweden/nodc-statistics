@@ -27,7 +27,8 @@ def get_allowed_depth_interval(deph, standard_depths):
     Sätt spann för djup nära standarddjupen.
     Mindre spann i ytan och större spann ju djupare vi kommer
     """
-    # TODO: use basin specific standard depths (Skagerrak and Kattegat differs from the Baltic)
+    # TODO: use basin specific standard depths (Skagerrak and Kattegat differs from the
+    #  Baltic)
 
     # grunda djup
     if deph < 20:

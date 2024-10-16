@@ -57,7 +57,8 @@ def read_geo_info_file(filepath: str):
 
 def get_area_tags(df, geo_info: gpd.GeoDataFrame):
     """
-    Hitta rätt "area_tag" för varje punkt i DataFrame df genom en rumslig join med geo_info.
+    Hitta rätt "area_tag" för varje punkt i DataFrame df genom en rumslig join med
+    geo_info.
     Returnera en DataFrame med kolumnerna "area_tag", "LONGI_DD" och "LATIT_DD".
     """
     # Skapa en geopandas GeoDataFrame med punkter från df
@@ -70,8 +71,8 @@ def get_area_tags(df, geo_info: gpd.GeoDataFrame):
         # Transformera punkternas CRS till matchande CRS
         points = points.to_crs(geo_info.crs)
 
-    # Använd geopandas sjoin för att göra en rumslig join mellan punkterna och polygonerna i geo_info
-    # med inner kommer endast de punkter som har en match i geo_info med
+    # Använd geopandas sjoin för att göra en rumslig join mellan punkterna och polygonerna
+    # i geo_info. Med inner kommer endast de punkter som har en match i geo_info med
     joined = gpd.sjoin(points, geo_info, how="inner", predicate="within")
 
     # Lägg till "LONGI_DD" och "LATIT_DD" från points till joined
@@ -128,7 +129,8 @@ if __name__ == "__main__":
 
     df = pd.read_csv(
         open(
-            "src/nodc_statistics/data/sharkweb_all_data_1991-2020_Physical and Chemical_1991-2020.csv",
+            "src/nodc_statistics/data/"
+            "sharkweb_all_data_1991-2020_Physical and Chemical_1991-2020.csv",
             encoding="utf-8",
         ),
         sep="\t",
