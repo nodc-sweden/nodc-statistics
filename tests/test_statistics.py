@@ -2,6 +2,7 @@ import datetime
 
 import numpy as np
 import pytest
+
 from nodc_statistics import statistic
 
 
@@ -136,9 +137,10 @@ def test_mean_is_between_lower_and_upper_limit(
         statistics_object["upper_limit"],
     ):
         if not np.isnan(mean_value):
-            assert (
-                lower_limit <= mean_value <= upper_limit
-            ), f"Mean value {mean_value} is not between lower limit {lower_limit} and upper limit {upper_limit}"
+            assert lower_limit <= mean_value <= upper_limit, (
+                f"Mean value {mean_value} is not between lower limit {lower_limit} and "
+                f"upper limit {upper_limit}"
+            )
 
 
 @pytest.mark.parametrize(
