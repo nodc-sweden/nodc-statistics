@@ -117,8 +117,8 @@ def test_mean_values_in_expected_range(
 @pytest.mark.parametrize(
     "given_parameter, given_latitude, given_longitude, given_datetime",
     (
-        ("TEMP_CTD", 58.3050, 10.759, datetime.datetime(2024, 5, 16)),
-        ("DOXY_CTD", 58.3050, 10.759, datetime.datetime(2024, 5, 16)),
+        ("TEMP_CTD", 57.8305, 10.5685, datetime.datetime(2024, 5, 16)),
+        ("DOXY_CTD", 57.8305, 10.5685, datetime.datetime(2024, 5, 16)),
     ),
 )
 def test_mean_is_between_lower_and_upper_limit(
