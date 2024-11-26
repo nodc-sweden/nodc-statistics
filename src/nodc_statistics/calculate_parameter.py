@@ -31,7 +31,7 @@ def get_allowed_depth_interval(deph, standard_depths):
     #  Baltic)
 
     # grunda djup
-    if deph < 20:
+    if deph < 30:
         if deph < 2.5:
             # ytvatten: returnera intervall 0-djup+2.5
             return 0, deph + 2.5
