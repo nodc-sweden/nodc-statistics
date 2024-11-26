@@ -62,7 +62,15 @@ class DataHandler:
         with SETTING_FILE["settings"].open("r", encoding="utf-8") as file:
             self.settings = json.load(file)
         self.data = self._read_shark_data(data_path)
-        self._add_parameters()
+        calculate_parameter.map_to_standard_depth(
+            data=self.data, standard_depths=self.settings["standard_depths"]
+        )
+        self._invalid_flags = {"S", "B", "E", 3, 4}
+        # Extract parameter column names by finding columns with matching 'Q_' prefix
+        quality_flag_columns = [col for col in self.data.columns if col.startswith('Q_')]
+        self._parameters = [col[2:] for col in quality_flag_columns if col[2:] in self.data.columns]
+        self._valid_data = None
+        self._add_parameters(self.data)
 
     def _read_shark_data(self, filepath: str):
         """read text file from sharkweb"""
@@ -76,28 +84,51 @@ class DataHandler:
 
         return df
 
-    def _add_parameters(self):
-        self.data.loc[:, "doxy"] = self.data.copy().apply(
+    @property
+    def invalid_flags(self):
+        return self._invalid_flags
+
+    @invalid_flags.setter
+    def invalid_flags(self, value):
+        # You may want to validate the input here
+        if not isinstance(value, (set, list, tuple)):
+            raise ValueError("Invalid flags must be a set, list, or tuple.")
+        self._invalid_flags = set(value)
+
+    @property
+    def valid_data(self):
+        return self._remove_invalid_data()
+
+    def _remove_invalid_data(self):
+
+        valid_data = self.data.copy()
+        # Set values to np.nan where the quality flag is invalid
+        for param in self._parameters:
+            valid_data[param] = valid_data[param].where(~valid_data[f"Q_{param}"].isin(self._invalid_flags), np.nan)
+
+        self._add_parameters(valid_data)
+
+        return valid_data
+
+    def _add_parameters(self, data):
+        data.loc[:, "doxy"] = data.apply(
             lambda row: calculate_parameter.get_prio_par_oxy(
                 row.DOXY_BTL, row.DOXY_CTD, row.Q_DOXY_BTL, row.Q_DOXY_CTD
             ),
             axis=1,
         )
 
-        self.data.loc[:, "salt"] = self.data.copy().apply(
+        data.loc[:, "salt"] = data.apply(
             lambda row: calculate_parameter.get_prio_par(
                 row.SALT_CTD, row.SALT_BTL, row.Q_SALT_CTD, row.Q_SALT_BTL
             ),
             axis=1,
         )
-        self.data.loc[:, "temp"] = self.data.copy().apply(
+        data.loc[:, "temp"] = data.apply(
             lambda row: calculate_parameter.get_prio_par(
                 row.TEMP_CTD, row.TEMP_BTL, row.Q_TEMP_CTD, row.Q_TEMP_BTL
             ),
             axis=1,
-        )
-        calculate_parameter.map_to_standard_depth(
-            data=self.data, standard_depths=self.settings["standard_depths"]
         )
 
 
@@ -279,12 +310,25 @@ def get_profile_statistics_for_parameter_and_sea_basin(
 
 
 if __name__ == "__main__":
-    # data = DataHandler(
-    #     "src/nodc_statistics/data/"
-    #     "sharkweb_all_data_1991-2020_Physical and Chemical_1991-2020.csv"
-    # )
-    # statistics = CalculateStatistics(data.data)
-    # statistics.profile_statistics()
+    data = DataHandler("C:/LenaV/code/data/sharkweb_data_1991-2020_for_statistics.txt"
+    )
+
+    geo_info = regions.read_geo_info_file(Path.home() / "SVAR2022_HELCOM_OSPAR_vs2.gpkg")
+    area_tags = regions.get_area_tags(df=data.data, geo_info=geo_info)
+    area_tags.drop_duplicates(inplace=True)
+    area_tags["pos_string"] = (
+        area_tags["LONGI_DD"].astype(str) + "_" + area_tags["LATIT_DD"].astype(str)
+    )
+    area_tags.to_csv(
+        "src/nodc_statistics/data/pos_area_tag_1991_2020.csv",
+        sep="\t",
+        index=False,
+        encoding="utf-8",
+    )
+    print(area_tags.head())
+    valid_data = data.valid_data
+    statistics = CalculateStatistics(valid_data)
+    statistics.profile_statistics()
 
     get_profile_statistics_for_parameter_and_position(
         "TEMP_CTD", 10.759, 58.3050, datetime.datetime(2024, 5, 16)
