@@ -6,11 +6,12 @@ import geopandas as gpd
 import pandas as pd
 
 GEOLAYERS_AREATAG = {
-    "typomrkust": "TYPOMRKUST",
-    "Skagerrak_without_coast": "NAMN",
-    "helcom_subbasins_with_coastal_and_offshore_division_2022_level3": "level_34",
+    "SVAR2022_typomrkust_lagad": "TYPOMRKUST",
+    "ospar_subregions_20160418_3857_lagad": "area_tag",
+    "helcom_subbasins_with_coastal_and_offshore_division_2022_level3_lagad": "level_34",
 }
 
+AREA_TAG_FILE = Path(__file__).parent / "data" / "pos_area_tag_1991_2020.csv"
 
 # @functools.cache
 # cache needs all argumetns to be hashable, GeoDataFrame is not
@@ -21,7 +22,7 @@ def sea_basin_for_position(longitude, latitude, geo_info=None):
 
     if not isinstance(geo_info, gpd.GeoDataFrame):
         print("reading again in regions.sea_basin_for_position")
-        geo_info = read_geo_info_file(os.environ["QCTOOL_GEOPACKAGE"])
+        geo_info = read_geo_info_file(Path.home() / "SVAR2022_HELCOM_OSPAR_vs2.gpkg")
     area_tag_df = get_area_tags(df=point, geo_info=geo_info)
 
     if len(area_tag_df["area_tag"].values) > 1:
@@ -142,10 +143,10 @@ if __name__ == "__main__":
         area_tags["LONGI_DD"].astype(str) + "_" + area_tags["LATIT_DD"].astype(str)
     )
 
-    area_tags.to_csv(
-        "src/nodc_statistics/data/pos_area_tag_1991_2020.csv",
-        sep="\t",
-        index=False,
-        encoding="utf-8",
-    )
+    # area_tags.to_csv(
+    #     "src/nodc_statistics/data/pos_area_tag_1991_2020.csv",
+    #     sep="\t",
+    #     index=False,
+    #     encoding="utf-8",
+    # )
     print(area_tags.head())
