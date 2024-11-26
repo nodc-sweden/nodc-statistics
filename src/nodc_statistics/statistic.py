@@ -223,9 +223,21 @@ class CalculateStatistics:
             new_columns.append(f"{param}:{suffix}")
 
         grouped.columns = new_columns
-
         # Återställ index för att få en platt DataFrame
         grouped = grouped.reset_index().round(3)
+        # set a limit for minimum number of values to return statistics
+        threshold = 15
+        # Iterate through parameters and apply the condition
+        for param in self.settings["statistic_parameters"]:
+            # Identify all columns related to this parameter
+            related_cols = [col for col in grouped.columns if col.split(":")[0] == param]
+            # Identify the ':count' column
+            count_col = f"{param}:count"
+
+            # Apply the condition and set all related columns to np.nan
+            if count_col in grouped.columns and (grouped[count_col] <= threshold).any():
+                grouped.loc[grouped[count_col] <= threshold, related_cols] = np.nan
+
         if save:
             self._save_statistic_files(grouped)
 
