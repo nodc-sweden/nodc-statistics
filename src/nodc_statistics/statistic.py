@@ -251,7 +251,6 @@ def get_profile_statistics_for_parameter_and_position(
     parameter, longitude, latitude, point_in_time: datetime.datetime
 ):
     sea_basin = regions.sea_basin_for_position(longitude, latitude)
-
     return get_profile_statistics_for_parameter_and_sea_basin(
         parameter, sea_basin, point_in_time
     )
@@ -277,10 +276,9 @@ def get_profile_statistics_for_parameter_and_sea_basin(
 
     # Filter rows based on the month
     filtered_df = df[df["month"].astype(int) == point_in_time.month]
-
     try:
         filtered_df[f"{parameter}:mean"]
-        std_values = filtered_df[f"{parameter}:std"]
+        filtered_df[f"{parameter}:std"]
     except KeyError:
         print(f"no {parameter} for {sea_basin} ")
         return {
@@ -294,6 +292,16 @@ def get_profile_statistics_for_parameter_and_sea_basin(
     mean_values = filtered_df[f"{parameter}:mean"].apply(nan_float).tolist()
     std_values = filtered_df[f"{parameter}:std"].apply(nan_float).tolist()
     depth = filtered_df["depth"].apply(nan_float).tolist()
+
+    for i, values in enumerate(zip(
+        mean_values,
+        std_values,
+    )):
+        # Check if any value is np.nan
+        if any(np.isnan(value) for value in values):
+            # Set all values at this index to np.nan
+            mean_values[i] = np.nan
+            std_values[i] = np.nan
 
     return {
         "mean": mean_values,
