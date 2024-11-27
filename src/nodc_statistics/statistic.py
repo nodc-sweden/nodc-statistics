@@ -5,6 +5,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from nodc_calculations.calculate import dissolved_inorganic_nitrogen, oxygen_saturation
 
 from nodc_statistics import calculate_parameter, regions
 
@@ -68,13 +69,15 @@ class DataHandler:
         self._invalid_flags = {"S", "B", "E", 3, 4}
         # Extract parameter column names by finding columns with matching 'Q_' prefix
         quality_flag_columns = [col for col in self.data.columns if col.startswith('Q_')]
+        for col in quality_flag_columns:
+            self.data[col] = self.data[col].astype(str)
+
         self._parameters = [col[2:] for col in quality_flag_columns if col[2:] in self.data.columns]
         self._valid_data = None
         self._add_parameters(self.data)
 
     def _read_shark_data(self, filepath: str):
         """read text file from sharkweb"""
-
         file_path = Path(filepath)
         print(f"reading file {file_path}\n... ... ...")
         df = pd.read_csv(open(file_path, encoding="utf-8"), sep="\t")
@@ -106,8 +109,6 @@ class DataHandler:
         for param in self._parameters:
             valid_data[param] = valid_data[param].where(~valid_data[f"Q_{param}"].isin(self._invalid_flags), np.nan)
 
-        self._add_parameters(valid_data)
-
         return valid_data
 
     def _add_parameters(self, data):
@@ -131,6 +132,24 @@ class DataHandler:
             axis=1,
         )
 
+        din_data = dissolved_inorganic_nitrogen(
+            data.rename(
+                columns={
+                    "Q_DOXY_BTL": "Q_doxy",
+                }
+            )
+        )
+        data["din"] = din_data["din"].copy()
+
+        _, _, o2sat_data = oxygen_saturation(
+            data.rename(
+                columns={
+                    "Q_DOXY_BTL": "Q_doxy",
+                }
+            )
+        )
+        print(o2sat_data.head())
+        data["oxygen_saturation"] = o2sat_data["oxygen_saturation"].copy()
 
 class CalculateStatistics:
     def __init__(self, data: pd.DataFrame):
@@ -332,21 +351,22 @@ def get_profile_statistics_for_parameter_and_sea_basin(
 if __name__ == "__main__":
     data = DataHandler("C:/LenaV/code/data/sharkweb_data_1991-2020_for_statistics.txt"
     )
-
-    geo_info = regions.read_geo_info_file(Path.home() / "SVAR2022_HELCOM_OSPAR_vs2.gpkg")
-    area_tags = regions.get_area_tags(df=data.data, geo_info=geo_info)
-    area_tags.drop_duplicates(inplace=True)
-    area_tags["pos_string"] = (
-        area_tags["LONGI_DD"].astype(str) + "_" + area_tags["LATIT_DD"].astype(str)
-    )
-    area_tags.to_csv(
-        "src/nodc_statistics/data/pos_area_tag_1991_2020.csv",
-        sep="\t",
-        index=False,
-        encoding="utf-8",
-    )
-    print(area_tags.head())
     valid_data = data.valid_data
+
+    # geo_info = regions.read_geo_info_file(Path.home() / "SVAR2022_HELCOM_OSPAR_vs2.gpkg")
+    # area_tags = regions.get_area_tags(df=data.data, geo_info=geo_info)
+    # area_tags.drop_duplicates(inplace=True)
+    # area_tags["pos_string"] = (
+    #     area_tags["LONGI_DD"].astype(str) + "_" + area_tags["LATIT_DD"].astype(str)
+    # )
+    # area_tags.to_csv(
+    #     "src/nodc_statistics/data/pos_area_tag_1991_2020.csv",
+    #     sep="\t",
+    #     index=False,
+    #     encoding="utf-8",
+    # )
+    # print(area_tags.head())
+
     statistics = CalculateStatistics(valid_data)
     statistics.profile_statistics()
 

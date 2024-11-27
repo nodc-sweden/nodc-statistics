@@ -19,7 +19,11 @@
 		"PH",
 		"ALKY",
 		"NTOT",
-		"PTOT"
+		"PTOT",
+		"doxy",
+		"din",
+		"salt",
+		"temp"
 	],
 	"standard_depths": [
 		0,
