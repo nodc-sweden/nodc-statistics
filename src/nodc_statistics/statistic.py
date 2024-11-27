@@ -68,11 +68,13 @@ class DataHandler:
         )
         self._invalid_flags = {"S", "B", "E", 3, 4}
         # Extract parameter column names by finding columns with matching 'Q_' prefix
-        quality_flag_columns = [col for col in self.data.columns if col.startswith('Q_')]
+        quality_flag_columns = [col for col in self.data.columns if col.startswith("Q_")]
         for col in quality_flag_columns:
             self.data[col] = self.data[col].astype(str)
 
-        self._parameters = [col[2:] for col in quality_flag_columns if col[2:] in self.data.columns]
+        self._parameters = [
+            col[2:] for col in quality_flag_columns if col[2:] in self.data.columns
+        ]  # noqa: E501
         self._valid_data = None
         self._add_parameters(self.data)
 
@@ -103,11 +105,12 @@ class DataHandler:
         return self._remove_invalid_data()
 
     def _remove_invalid_data(self):
-
         valid_data = self.data.copy()
         # Set values to np.nan where the quality flag is invalid
         for param in self._parameters:
-            valid_data[param] = valid_data[param].where(~valid_data[f"Q_{param}"].isin(self._invalid_flags), np.nan)
+            valid_data[param] = valid_data[param].where(
+                ~valid_data[f"Q_{param}"].isin(self._invalid_flags), np.nan
+            )  # noqa: E501
 
         return valid_data
 
@@ -151,6 +154,7 @@ class DataHandler:
         print(o2sat_data.head())
         data["oxygen_saturation"] = o2sat_data["oxygen_saturation"].copy()
 
+
 class CalculateStatistics:
     def __init__(self, data: pd.DataFrame):
         self.data = data
@@ -178,9 +182,6 @@ class CalculateStatistics:
         self.data["pos_string"] = self.data.apply(
             lambda row: "_".join([str(row.LONGI_DD), str(row.LATIT_DD)]), axis=1
         )
-        # self.data["area_tag"] = self.data.apply(
-        #     lambda row: "_".join([str(row[tag]) for tag in area_tags]), axis=1
-        # )
         self._map_areas_to_pos_str()
 
         self.areas = self.data["area_tag"].unique()
@@ -324,10 +325,12 @@ def get_profile_statistics_for_parameter_and_sea_basin(
     std_values = filtered_df[f"{parameter}:std"].apply(nan_float).tolist()
     depth = filtered_df["depth"].apply(nan_float).tolist()
 
-    for i, values in enumerate(zip(
-        mean_values,
-        std_values,
-    )):
+    for i, values in enumerate(
+        zip(
+            mean_values,
+            std_values,
+        )
+    ):
         # Check if any value is np.nan
         if any(np.isnan(value) for value in values):
             # Set all values at this index to np.nan
@@ -349,11 +352,10 @@ def get_profile_statistics_for_parameter_and_sea_basin(
 
 
 if __name__ == "__main__":
-    data = DataHandler("C:/LenaV/code/data/sharkweb_data_1991-2020_for_statistics.txt"
-    )
+    data = DataHandler("C:/LenaV/code/data/sharkweb_data_1991-2020_for_statistics.txt")
     valid_data = data.valid_data
 
-    # geo_info = regions.read_geo_info_file(Path.home() / "SVAR2022_HELCOM_OSPAR_vs2.gpkg")
+    # geo_info = regions.read_geo_info_file(Path.home() / "SVAR2022_HELCOM_OSPAR_vs2.gpkg")  # noqa: E501
     # area_tags = regions.get_area_tags(df=data.data, geo_info=geo_info)
     # area_tags.drop_duplicates(inplace=True)
     # area_tags["pos_string"] = (
