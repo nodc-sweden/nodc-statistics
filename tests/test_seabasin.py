@@ -2,6 +2,7 @@ from pathlib import Path
 
 import geopandas as gpd
 import pytest
+
 from nodc_statistics import regions
 
 """
@@ -32,7 +33,9 @@ def test_get_correct_sea_basin_for_position(
     assert sea_basin == expected_sea_basin
 
 
-@pytest.mark.parametrize("given_path", ((Path.home() / "SVAR2022_HELCOM_OSPAR_vs2.gpkg",)))
+@pytest.mark.parametrize(
+    "given_path", ((Path.home() / "SVAR2022_HELCOM_OSPAR_vs2.gpkg",))
+)  # noqa: E501
 def test_read_geopackage_to_geodataframe(given_path):
     geo_info = regions.read_geo_info_file(given_path)
 

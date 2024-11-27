@@ -1,4 +1,3 @@
-import os
 import time
 from pathlib import Path
 
@@ -12,6 +11,7 @@ GEOLAYERS_AREATAG = {
 }
 
 AREA_TAG_FILE = Path(__file__).parent / "data" / "pos_area_tag_1991_2020.csv"
+
 
 # @functools.cache
 # cache needs all argumetns to be hashable, GeoDataFrame is not
