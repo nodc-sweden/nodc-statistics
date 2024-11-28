@@ -12,6 +12,8 @@ GEOLAYERS_AREATAG = {
 
 AREA_TAG_FILE = Path(__file__).parent / "data" / "pos_area_tag_1991_2020.csv"
 
+GPKG_FILE = Path.home() / "SVAR2022_HELCOM_OSPAR_vs2.gpkg"
+
 
 # @functools.cache
 # cache needs all argumetns to be hashable, GeoDataFrame is not
@@ -20,18 +22,31 @@ def sea_basin_for_position(longitude, latitude, geo_info=None):
         return None
     point = pd.DataFrame({"LONGI_DD": [longitude], "LATIT_DD": [latitude]})
 
-    if not isinstance(geo_info, gpd.GeoDataFrame):
+    if not isinstance(geo_info, gpd.GeoDataFrame) and GPKG_FILE.exists():
         print("reading again in regions.sea_basin_for_position")
-        geo_info = read_geo_info_file(Path.home() / "SVAR2022_HELCOM_OSPAR_vs2.gpkg")
-    area_tag_df = get_area_tags(df=point, geo_info=geo_info)
+        geo_info = read_geo_info_file(GPKG_FILE)
+        area_tag_df = get_area_tags(df=point, geo_info=geo_info)
+        if len(area_tag_df["area_tag"].values) > 1:
+            print(f'too many area_tag results {area_tag_df["area_tag"]}')
+        value = area_tag_df["area_tag"].values[0] or None
+    else:
+        print("no gpkg file, using area_tag textfile instead")
+        area_tag_df = pd.read_csv(AREA_TAG_FILE, sep="\t", encoding="utf-8")
+        # Create pos_string from input coordinates
+        pos_string = f"{longitude}_{latitude}"
 
-    if len(area_tag_df["area_tag"].values) > 1:
-        print(f'too many area_tag results {area_tag_df["area_tag"]}')
-    value = area_tag_df["area_tag"].values[0] or None
+        # Look for a match in the DataFrame
+        match = area_tag_df.loc[area_tag_df["pos_string"] == pos_string, "area_tag"]
+
+        # Return the matched area_tag or None
+        value = match.iloc[0] if not match.empty else None
+        if value is None:
+            print(f"no information for longitude: {longitude}, latitude: {latitude}")
+
     return value if not pd.isna(value) else None
 
 
-def read_geo_info_file(filepath: str):
+def read_geo_info_file(filepath: Path):
     """
     read a geopackage or shapefile to a geodataframe
     """
