@@ -10,7 +10,9 @@ GEOLAYERS_AREATAG = {
     "helcom_subbasins_with_coastal_and_offshore_division_2022_level3_lagad": "level_34",
 }
 
-AREA_TAG_FILE = Path(__file__).parent / "data" / "pos_area_tag_1991_2020.csv"
+AREA_TAG_FILE = (
+    Path(__file__).parent / "data" / "pos_area_tag_SVAR2022_HELCOM_OSPAR_vs2.csv"
+)
 
 GPKG_FILE = Path.home() / "SVAR2022_HELCOM_OSPAR_vs2.gpkg"
 
@@ -122,46 +124,23 @@ def get_area_tags(df, geo_info: gpd.GeoDataFrame):
         return pd.DataFrame(columns=["area_tag", "LONGI_DD", "LATIT_DD"])
 
 
-def save_area_tag_files(data, column_name="area_tag", file_format="csv"):
-    # Gruppér DataFrame efter `area_tag`
-    grouped = data.groupby(column_name)
-
-    # Spara varje grupp i en separat fil
-    for area_tag, group in grouped:
-        # Skapa ett filnamn baserat på area_tag
-        file_name = f"{area_tag}.{file_format}"
-
-        # Spara gruppen till en fil
-        group.to_csv(file_name, index=False)
-
-
-if __name__ == "__main__":
-    save_kwargs = {
-        "sep": "\t",
-        "encoding": "utf-8",
-        "index": False,
-        "float_format": "%.2f",
-    }
-
-    df = pd.read_csv(
-        open(
-            "src/nodc_statistics/data/"
-            "sharkweb_all_data_1991-2020_Physical and Chemical_1991-2020.csv",
-            encoding="utf-8",
-        ),
-        sep="\t",
-    )
-
-    area_tags = get_area_tags(df)
+def update_area_tag_file(coordinates_filepath):
+    data = pd.read_csv(coordinates_filepath)
+    data.columns = ["LONGI_DD", "LATIT_DD"]
+    geo_info = read_geo_info_file(Path.home() / "SVAR2022_HELCOM_OSPAR_vs2.gpkg")  # noqa: E501
+    area_tags = get_area_tags(df=data, geo_info=geo_info)
     area_tags.drop_duplicates(inplace=True)
     area_tags["pos_string"] = (
         area_tags["LONGI_DD"].astype(str) + "_" + area_tags["LATIT_DD"].astype(str)
     )
-
-    # area_tags.to_csv(
-    #     "src/nodc_statistics/data/pos_area_tag_1991_2020.csv",
-    #     sep="\t",
-    #     index=False,
-    #     encoding="utf-8",
-    # )
+    area_tags.to_csv(
+        "src/nodc_statistics/data/pos_area_tag_SVAR2022_HELCOM_OSPAR_vs2.csv",
+        sep="\t",
+        index=False,
+        encoding="utf-8",
+    )
     print(area_tags.head())
+
+
+if __name__ == "__main__":
+    update_area_tag_file("C:/LenaV/code/data/coordinates.txt")

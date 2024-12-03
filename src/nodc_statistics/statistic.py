@@ -18,7 +18,9 @@ SETTING_FILE = {
     "settings": Path(__file__).parent / "data" / "settings.json",
 }
 
-AREA_TAG_FILE = Path(__file__).parent / "data" / "pos_area_tag_1991_2020.csv"
+AREA_TAG_FILE = (
+    Path(__file__).parent / "data" / "pos_area_tag_SVAR2022_HELCOM_OSPAR_vs2.csv"
+)
 
 SAVE_KWARGS = {"sep": "\t", "encoding": "utf-8", "index": False, "float_format": "%.2f"}
 
@@ -107,6 +109,8 @@ class DataHandler:
     def _remove_invalid_data(self):
         valid_data = self.data.copy()
         # Set values to np.nan where the quality flag is invalid
+        # The where function keeps the original value if the condition is True,
+        # and sets it to np.nan if the condition is False. That is the reason for the ~
         for param in self._parameters:
             valid_data[param] = valid_data[param].where(
                 ~valid_data[f"Q_{param}"].isin(self._invalid_flags), np.nan
@@ -354,20 +358,6 @@ def get_profile_statistics_for_parameter_and_sea_basin(
 if __name__ == "__main__":
     data = DataHandler("C:/LenaV/code/data/sharkweb_data_1991-2020_for_statistics.txt")
     valid_data = data.valid_data
-
-    # geo_info = regions.read_geo_info_file(Path.home() / "SVAR2022_HELCOM_OSPAR_vs2.gpkg")  # noqa: E501
-    # area_tags = regions.get_area_tags(df=data.data, geo_info=geo_info)
-    # area_tags.drop_duplicates(inplace=True)
-    # area_tags["pos_string"] = (
-    #     area_tags["LONGI_DD"].astype(str) + "_" + area_tags["LATIT_DD"].astype(str)
-    # )
-    # area_tags.to_csv(
-    #     "src/nodc_statistics/data/pos_area_tag_1991_2020.csv",
-    #     sep="\t",
-    #     index=False,
-    #     encoding="utf-8",
-    # )
-    # print(area_tags.head())
 
     statistics = CalculateStatistics(valid_data)
     statistics.profile_statistics()
