@@ -5,7 +5,11 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from nodc_calculations.calculate import dissolved_inorganic_nitrogen, oxygen_saturation
+from nodc_calculations.calculate import (
+    dissolved_inorganic_nitrogen,
+    oxygen,
+    oxygen_saturation,
+)
 
 from nodc_statistics import calculate_parameter, regions
 
@@ -119,13 +123,7 @@ class DataHandler:
         return valid_data
 
     def _add_parameters(self, data):
-        data.loc[:, "doxy"] = data.apply(
-            lambda row: calculate_parameter.get_prio_par_oxy(
-                row.DOXY_BTL, row.DOXY_CTD, row.Q_DOXY_BTL, row.Q_DOXY_CTD
-            ),
-            axis=1,
-        )
-
+        df = oxygen(data)
         data.loc[:, "salt"] = data.apply(
             lambda row: calculate_parameter.get_prio_par(
                 row.SALT_CTD, row.SALT_BTL, row.Q_SALT_CTD, row.Q_SALT_BTL
@@ -139,22 +137,12 @@ class DataHandler:
             axis=1,
         )
 
-        din_data = dissolved_inorganic_nitrogen(
-            data.rename(
-                columns={
-                    "Q_DOXY_BTL": "Q_doxy",
-                }
-            )
-        )
-        data["din"] = din_data["din"].copy()
+        data["doxy"] = df["DOXY_BTL"].copy()
+        data["Q_doxy"] = df["Q_DOXY_BTL"].copy()
 
-        _, _, o2sat_data = oxygen_saturation(
-            data.rename(
-                columns={
-                    "Q_DOXY_BTL": "Q_doxy",
-                }
-            )
-        )
+        dissolved_inorganic_nitrogen(data)
+
+        _, _, o2sat_data = oxygen_saturation(data)
         print(o2sat_data.head())
         data["oxygen_saturation"] = o2sat_data["oxygen_saturation"].copy()
 
@@ -172,6 +160,9 @@ class CalculateStatistics:
 
     def _agg_station_data(self):
         # Definiera kolumner att gruppera på
+        # Skulle grupperat på REG_ID men fiskestationer saknar REG_ID och de vill vi ha
+        # Använder STATN för alla så länge.
+        # Alternativ: Använda REG_ID när det finns och fylla ut med STATN när det saknas?
         group_cols = ["STATN", "depth", "year", "month", "area_tag"]
 
         # Skapa dictionary för aggregering
@@ -329,17 +320,19 @@ def get_profile_statistics_for_parameter_and_sea_basin(
     std_values = filtered_df[f"{parameter}:std"].apply(nan_float).tolist()
     depth = filtered_df["depth"].apply(nan_float).tolist()
 
-    for i, values in enumerate(
-        zip(
-            mean_values,
-            std_values,
-        )
-    ):
-        # Check if any value is np.nan
-        if any(np.isnan(value) for value in values):
-            # Set all values at this index to np.nan
-            mean_values[i] = np.nan
-            std_values[i] = np.nan
+    # filter the lists to remove depths without statistics
+    filtered_data = [
+        (mean, std, depth)
+        for mean, std, depth in zip(mean_values, std_values, depth)
+        if not (np.isnan(mean) or np.isnan(std))
+    ]
+
+    # Unzip filtered data back into two separate lists
+    mean_values, std_values, depth = (
+        map(list, zip(*filtered_data))
+        if filtered_data
+        else ([np.nan], [np.nan], [np.nan])
+    )
 
     return {
         "mean": mean_values,
