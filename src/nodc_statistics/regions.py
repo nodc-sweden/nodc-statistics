@@ -23,8 +23,10 @@ def sea_basin_for_position(longitude, latitude, geo_info=None):
     if not all((-180 <= longitude <= 180, -90 <= latitude <= 90)):
         return None
     point = pd.DataFrame({"LONGI_DD": [longitude], "LATIT_DD": [latitude]})
+    if not isinstance(geo_info, gpd.GeoDataFrame) and GPKG_FILE.exists:
+        geo_info = read_geo_info_file(GPKG_FILE)
 
-    if not isinstance(geo_info, gpd.GeoDataFrame) and GPKG_FILE.exists():
+    if isinstance(geo_info, gpd.GeoDataFrame):
         print("reading again in regions.sea_basin_for_position")
         geo_info = read_geo_info_file(GPKG_FILE)
         area_tag_df = get_area_tags(df=point, geo_info=geo_info)
@@ -32,7 +34,7 @@ def sea_basin_for_position(longitude, latitude, geo_info=None):
             print(f'too many area_tag results {area_tag_df["area_tag"]}')
         value = area_tag_df["area_tag"].values[0] or None
     else:
-        print("no gpkg file, using area_tag textfile instead")
+        print("no geo_info, using area_tag textfile instead")
         area_tag_df = pd.read_csv(AREA_TAG_FILE, sep="\t", encoding="utf-8")
         # Create pos_string from input coordinates
         pos_string = f"{longitude}_{latitude}"
@@ -143,4 +145,5 @@ def update_area_tag_file(coordinates_filepath):
 
 
 if __name__ == "__main__":
-    update_area_tag_file("C:/LenaV/code/data/coordinates.txt")
+    # update_area_tag_file("C:/LenaV/code/data/coordinates.txt")
+    read_geo_info_file(GPKG_FILE)
