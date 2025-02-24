@@ -5,7 +5,7 @@
 groups = ["default", "dev"]
 strategy = ["cross_platform", "inherit_metadata"]
 lock_version = "4.4.1"
-content_hash = "sha256:89e15b5061941742e48e8680e53a1eacf2df3080760350df9431f8b762fe3621"
+content_hash = "sha256:1a8b4dbfdf0ec0ac4eae4fff11cbc83491d6c2cb7649fa493e1da1ad35b0b397"
 
 [[package]]
 name = "certifi"
@@ -150,11 +150,11 @@ files = [
 
 [[package]]
 name = "nodc-calculations"
-version = "0.1.0"
+version = "2025.1.0"
 requires_python = ">=3.9"
-git = "https://github.com/nodc-sweden/nodc-calculations/"
-ref = "main"
-revision = "e7540f2445cb6f57c106780c12321f414decfe53"
+git = "https://github.com/nodc-sweden/nodc-calculations"
+ref = "v2025.1.0"
+revision = "7fc845ecb690ec5c1dae6b37cae4cb1c473495c8"
 summary = "Functions to calculate physical, chemical and biological in the marine envrionment"
 groups = ["default"]
 dependencies = [
