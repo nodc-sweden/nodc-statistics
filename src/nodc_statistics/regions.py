@@ -24,11 +24,10 @@ def sea_basin_for_position(longitude, latitude, geo_info=None):
         return None
     point = pd.DataFrame({"LONGI_DD": [longitude], "LATIT_DD": [latitude]})
     if not isinstance(geo_info, gpd.GeoDataFrame) and GPKG_FILE.exists:
+        print("reading geopackage in regions.sea_basin_for_position")
         geo_info = read_geo_info_file(GPKG_FILE)
 
     if isinstance(geo_info, gpd.GeoDataFrame):
-        print("reading again in regions.sea_basin_for_position")
-        geo_info = read_geo_info_file(GPKG_FILE)
         area_tag_df = get_area_tags(df=point, geo_info=geo_info)
         if len(area_tag_df["area_tag"].values) > 1:
             print(f'too many area_tag results {area_tag_df["area_tag"]}')
