@@ -126,8 +126,7 @@ def get_area_tags(df, geo_info: gpd.GeoDataFrame):
 
 
 def update_area_tag_file(coordinates_filepath):
-    data = pd.read_csv(coordinates_filepath)
-    data.columns = ["LONGI_DD", "LATIT_DD"]
+    data = pd.read_csv(coordinates_filepath, sep=",", encoding="utf8")
     geo_info = read_geo_info_file(Path.home() / "SVAR2022_HELCOM_OSPAR_vs2.gpkg")  # noqa: E501
     area_tags = get_area_tags(df=data, geo_info=geo_info)
     area_tags.drop_duplicates(inplace=True)
@@ -144,5 +143,4 @@ def update_area_tag_file(coordinates_filepath):
 
 
 if __name__ == "__main__":
-    # update_area_tag_file("C:/LenaV/code/data/coordinates.txt")
-    read_geo_info_file(GPKG_FILE)
+    update_area_tag_file("C:/LenaV/code/data/coordinates.txt")
