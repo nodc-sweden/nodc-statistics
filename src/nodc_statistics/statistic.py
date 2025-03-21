@@ -3,6 +3,7 @@ import functools
 import json
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from nodc_calculations.calculate import (
@@ -422,7 +423,265 @@ def get_profile_statistics_for_parameter_and_sea_basin(
             for mean_value, std_value in zip(mean_values, std_values)
         ],
         "depth": depth,
+        "min_depth": min_depth,
+        "max_depth": max_depth,
     }
+
+
+# Load the JSON files
+def load_json(file_path):
+    with open(file_path, "r") as f:
+        return json.load(f)
+
+
+def create_sharktoolbox_json_from_directory(data_directory):
+    get_stb_basin_names = {str(no): f"TYPOMR_KOD_{str(no)}" for no in range(25)}
+    # Add the special cases for 1 and 12 with 's' and 'n'
+    for base_no in [1, 12]:
+        get_stb_basin_names[f"{base_no}s"] = f"TYPOMR_KOD_{base_no}s"
+        get_stb_basin_names[f"{base_no}n"] = f"TYPOMR_KOD_{base_no}n"
+    get_stb_basin_names.update(
+        {
+            "Bothnian Bay": "BASIN_NR_1",
+            "The Quark": "BASIN_NR_2",
+            "Bothnian Sea": "BASIN_NR_3",
+            "Åland Sea": "BASIN_NR_4",
+            "Gulf of Finland": "BASIN_NR_6",
+            "Northern Baltic Proper": "BASIN_NR_7",
+            "Gulf of Riga": "BASIN_NR_10",
+            "Western Gotland Basin": "BASIN_NR_8",
+            "Eastern Gotland Basin": "BASIN_NR_9",
+            "Gdansk Basin": "BASIN_NR_11",
+            "Bornholm Basin": "BASIN_NR_12",
+            "Arkona Basin": "BASIN_NR_13",
+            "Great Belt": "BASIN_NR_14",
+            "Kattegat": "BASIN_NR_16",
+            "Skagerrak": "BASIN_NR_17",
+        }
+    )
+
+    # Initialize config dictionary
+    config_data = {}
+
+    # Define file directory
+    data_dir = Path(data_directory)
+
+    # Loop over all CSV files
+    for file_path in data_dir.glob("*.csv"):
+        sea_area = file_path.stem  # Extract sea area from filename
+        df = pd.read_csv(file_path, sep="\t", encoding="utf8")
+        df.rename(
+            columns={
+                "depth": "DEPH_intrp",  # or replace how it is read in stb
+                "din:mean": "DIN:mean",
+                "salt:mean": "SALT:mean",
+                "temp:mean": "TEMP:mean",
+                "oxygen_saturation:mean": "DOXY_SAT:mean",
+                "doxy:mean": "DOXY:mean",
+                "din:std": "DIN:std",
+                "salt:std": "SALT:std",
+                "temp:std": "TEMP:std",
+                "doxy:std": "DOXY:std",
+            },
+            inplace=True,
+        )
+        # config_data[get_stb_basin_names.get(sea_area, sea_area)] = {}
+        # Extract unique parameter names
+        param_names = [
+            col for col in df.columns if any(sub in col for sub in ["std", "mean"])
+        ]
+
+        profile = {}
+        for month, group in df.groupby("month"):
+            # Replace NaN with None and ensure the values are converted to lists
+            profile[str(month)] = {
+                param: group[param]
+                .where(pd.notna(group[param]), None)
+                .tolist()  # Convert to list
+                for param in param_names + ["DEPH_intrp"]
+            }
+
+        config_data[get_stb_basin_names.get(sea_area, sea_area)] = {"profile": profile}
+
+    def replace_nan_with_none(d):
+        """Recursively replace NaN values with None in the dictionary."""
+        if isinstance(d, dict):
+            return {k: replace_nan_with_none(v) for k, v in d.items()}
+        elif isinstance(d, list):
+            return [replace_nan_with_none(item) for item in d]
+        return None if pd.isna(d) else d
+
+    # Replace NaN with None in the entire config_data dictionary
+    # config_data = replace_nan_with_none(config_data)
+
+    return config_data
+
+
+SVAR2022_basin_names = {
+    "BASIN_NR_1": "Bothnian Bay",
+    "BASIN_NR_2": "The Quark",
+    "BASIN_NR_3": "Bothnian Sea",
+    "BASIN_NR_4": "Åland Sea",
+    "BASIN_NR_6": "Gulf of Finland",
+    "BASIN_NR_7": "Northern Baltic Proper",
+    "BASIN_NR_10": "Gulf of Riga",
+    "BASIN_NR_8": "Western Gotland Basin",
+    "BASIN_NR_9": "Eastern Gotland Basin",
+    "BASIN_NR_11": "Gdansk Basin",
+    "BASIN_NR_12": "Bornholm Basin",
+    "BASIN_NR_13": "Arkona Basin",
+    "BASIN_NR_14": "Great Belt",
+    "BASIN_NR_16": "Kattegat",
+    "BASIN_NR_17": "Skagerrak",
+    "TYPOMR_KOD_1n": "Västkusten inre norra",
+    "TYPOMR_KOD_1s": "Västkusten inre södra",
+    "TYPOMR_KOD_2": "Västkusten fjordar",
+    "TYPOMR_KOD_3": "Västkusten yttre Skagerrak",
+    "TYPOMR_KOD_4": "Västkusten yttre Kattegatt",
+    "TYPOMR_KOD_5": "halland",
+    "TYPOMR_KOD_6": "Öresund",
+    "TYPOMR_KOD_7": "Skåne",
+    "TYPOMR_KOD_8": "Blekinge, Kalmar inre",
+    "TYPOMR_KOD_9": "Blekinge, Kalmar yttre",
+    "TYPOMR_KOD_10": "Gotland sydöst, Öland öster",
+    "TYPOMR_KOD_11": "Gotland väster, norr",
+    "TYPOMR_KOD_12s": "Östergötland, Sthlm södra",
+    "TYPOMR_KOD_12n": "Östergötland, Sthlm norra",
+    "TYPOMR_KOD_13": "Östergötland intre",
+    "TYPOMR_KOD_14": "Östergötland yttre",
+    "TYPOMR_KOD_15": "Sthlm skärgård yttre",
+    "TYPOMR_KOD_16": "Södra bottehavet, inre",
+    "TYPOMR_KOD_17": "Södra bottehavet, yttre",
+    "TYPOMR_KOD_18": "Höga kusten inre",
+    "TYPOMR_KOD_19": "Höga kusten yttre",
+    "TYPOMR_KOD_20": "Kvarken inre",
+    "TYPOMR_KOD_21": "Kvarken yttre",
+    "TYPOMR_KOD_22": "Bottenviken inre",
+    "TYPOMR_KOD_23": "Bottenviken yttre",
+    "TYPOMR_KOD_24": "Sthlm inre skärgård",
+}
+
+
+# Function to create plots
+def plot_comparison(original_data, new_data, sea_basin, months):
+    parameters = ["SALT", "TEMP", "DOXY", "PHOS", "DIN", "SIO3-SI"]
+
+    # Iterate over the parameters and create plots
+    for month in months:
+        try:
+            original = original_data[sea_basin]["profile"].get(str(month), {})
+        except KeyError:
+            print(f"original data missing in {sea_basin}")
+            continue
+        try:
+            new = new_data[sea_basin]["profile"].get(str(month), {})
+        except KeyError:
+            print(f"new data missing in {sea_basin}")
+            continue
+
+        fig, axs = plt.subplots(2, 3, figsize=(11.69, 8.27))
+        axs = axs.flatten()
+        for i, param in enumerate(parameters):
+            ax = axs[i]
+            # Get the data for the original and new datasets
+            depth_original = original.get("DEPH", [np.nan])
+            depth_new = new.get("DEPH_intrp", [np.nan])
+            try:
+                original_mean = original.get(
+                    f"{param}:mean", len(depth_original) * [np.nan]
+                )
+                original_std = original.get(
+                    f"{param}:std", len(depth_original) * [np.nan]
+                )
+            except KeyError:
+                print(f"original data missing in month {month} {param}")
+            try:
+                new_mean = new.get(f"{param}:mean", len(depth_new) * [np.nan])
+                new_std = new.get(f"{param}:std", len(depth_new) * [np.nan])
+            except KeyError:
+                print(f"new data missing in {sea_basin}, month {month} {param}")
+
+            # if not original_mean or not new_mean:
+            #     continue  # Skip if there's no data for the parameter
+
+            # Plot the original data (solid line)
+            ax.plot(
+                original_mean,
+                depth_original,
+                color="black",
+                label="Original",
+                linewidth=2,
+            )
+            ax.fill_betweenx(
+                depth_original,
+                np.array(original_mean) - 2 * np.array(original_std),
+                np.array(original_mean) + 2 * np.array(original_std),
+                color="grey",
+                alpha=0.3,
+            )
+            ax.plot(
+                np.array(original_mean) - 2 * np.array(original_std),
+                depth_original,
+                color="black",
+                linestyle="-",
+                linewidth=1,
+            )  # Border of grey area
+            ax.plot(
+                np.array(original_mean) + 2 * np.array(original_std),
+                depth_original,
+                color="black",
+                linestyle="-",
+                linewidth=1,
+            )  # Border of grey area
+
+            # Plot the new data (dashed line)
+            ax.plot(
+                new_mean,
+                depth_new,
+                color="black",
+                linestyle="--",
+                label="new",
+                linewidth=2,
+            )
+            ax.fill_betweenx(
+                depth_new,
+                np.array(new_mean) - 2 * np.array(new_std),
+                np.array(new_mean) + 2 * np.array(new_std),
+                color="grey",
+                alpha=0.3,
+            )
+            ax.plot(
+                np.array(new_mean) - 2 * np.array(new_std),
+                depth_new,
+                color="black",
+                linestyle="--",
+                linewidth=1,
+            )  # Border of grey area
+            ax.plot(
+                np.array(new_mean) + 2 * np.array(new_std),
+                depth_new,
+                color="black",
+                linestyle="--",
+                linewidth=1,
+            )  # Border of grey area
+
+            ax.set_title(f"{param}")
+            ax.set_ylabel("Depth (m)")
+            ax.set_xlabel(param)
+            ax.legend()
+            ax.yaxis.set_inverted(True)
+        fig.suptitle(f"{SVAR2022_basin_names.get(sea_basin, sea_basin)} - Month {month}")
+        # Adjust layout for better spacing
+        plt.tight_layout()
+
+        # Save the figure as a PNG file (one plot per sea_basin and month)
+        save_path = (
+            Path("..")
+            / "figures"
+            / f"{SVAR2022_basin_names.get(sea_basin, sea_basin)}_month_{month}_comparison.png"  # noqa: E501
+        )
+        fig.savefig(save_path, dpi=300)
+        plt.close(fig)  # Close the figure to free memory
 
 
 if __name__ == "__main__":
@@ -438,3 +697,39 @@ if __name__ == "__main__":
     get_profile_statistics_for_parameter_and_position(
         "TEMP_CTD", 10.759, 58.3050, datetime.datetime(2024, 5, 16)
     )
+    get_profile_statistics_for_parameter_and_sea_basin(
+        "TEMP_CTD", "Kattegat", datetime.datetime(2024, 5, 16)
+    )
+
+    ## create a json-file for sharktoolboc
+    directory_path = (
+        "C:/LenaV/code/w_qc-tool/nodc-statistics/src/nodc_statistics/data/statistics"
+    )
+    sharktoolbox_format = create_sharktoolbox_json_from_directory(
+        data_directory=directory_path
+    )
+    # Write to a JSON file
+    with open(
+        "C:/LenaV/code/w_sharktoolbox/Sharktoolbox/data/statistics/basin_statistics.json",
+        "w",
+    ) as f:
+        json.dump(sharktoolbox_format, f, indent=4)  # indent=4 makes it pretty-printed
+
+    ## Plot statistics
+    # Load original and new data from JSON files
+    original_data = load_json(
+        "C:/LenaV/code/w_sharktoolbox/SharkToolbox/data/statistics/basin_statistics_1991-2020.json"
+    )
+    new_data = load_json(
+        "C:/LenaV/code/w_sharktoolbox/SharkToolbox/data/statistics/basin_statistics.json"
+    )
+
+    # Sea basins to compare
+    sea_basins = list(original_data.keys())
+
+    # Loop over each sea basin and plot comparisons for all months
+    for sea_basin in sea_basins:
+        months = list(
+            original_data[sea_basin]["profile"].keys()
+        )  # Get months for the sea basin
+        plot_comparison(original_data, new_data, sea_basin, months)
