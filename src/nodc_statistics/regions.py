@@ -30,7 +30,7 @@ def sea_basin_for_position(longitude, latitude, geo_info=None):
     if isinstance(geo_info, gpd.GeoDataFrame):
         area_tag_df = get_area_tags(df=point, geo_info=geo_info)
         if len(area_tag_df["area_tag"].values) > 1:
-            print(f'too many area_tag results {area_tag_df["area_tag"]}')
+            print(f"too many area_tag results {area_tag_df['area_tag']}")
         value = area_tag_df["area_tag"].values[0] or None
     else:
         print("no geo_info, using area_tag textfile instead")
@@ -64,7 +64,7 @@ def read_geo_info_file(filepath: Path):
         t0 = time.perf_counter()
         gdf = gpd.read_file(file_path, layer=layer)
         t1 = time.perf_counter()
-        print(f"Read file took ({t1-t0:.3f} .s)")
+        print(f"Read file took ({t1 - t0:.3f} .s)")
         gdf = gdf.rename(columns={area_tag: "area_tag"})
         layers.append(gdf)
 
@@ -127,7 +127,7 @@ def get_area_tags(df, geo_info: gpd.GeoDataFrame):
 
 def update_area_tag_file(coordinates_filepath):
     data = pd.read_csv(coordinates_filepath, sep=",", encoding="utf8")
-    geo_info = read_geo_info_file(Path.home() / "SVAR2022_HELCOM_OSPAR_vs2.gpkg")  # noqa: E501
+    geo_info = read_geo_info_file(Path.home() / "SVAR2022_HELCOM_OSPAR_vs2.gpkg")
     area_tags = get_area_tags(df=data, geo_info=geo_info)
     area_tags.drop_duplicates(inplace=True)
     area_tags["pos_string"] = (

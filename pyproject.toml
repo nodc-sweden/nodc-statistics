@@ -17,13 +17,14 @@ readme = "README.md"
 license = {file = "LICENSE"}
 
 [build-system]
-requires = ["pdm-backend"]
-build-backend = "pdm.backend"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-[tool.pdm]
-distribution = true
+[tool.hatch.metadata]
+allow-direct-references=  true
 
-[tool.pdm.dev-dependencies]
+
+[dependency-groups]
 dev = [
     "pytest>=8.1.1",
     "ruff>=0.6.9",
@@ -35,11 +36,18 @@ line-length = 90
 indent-width = 4
 target-version = "py39"
 
-[tool.ruff.lint]
-select = ["F", "E", "W", "I001"]
-
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "auto"
+
+[tool.ruff.lint]
+select = [
+    "A",  # flake8-builtins
+    "F",  # pyflakes
+    "E", # pycodestyle: error
+    "W",  # pycodestyle: warning
+    "I001",  # isort: unsorted-imports
+    "RUF"  # Ruff-specific rules
+]

@@ -37,7 +37,7 @@ def test_get_correct_sea_basin_for_position(
 
 @pytest.mark.parametrize(
     "given_path", ((Path.home() / "SVAR2022_HELCOM_OSPAR_vs2.gpkg",))
-)  # noqa: E501
+)
 def test_read_geopackage_to_geodataframe(given_path):
     geo_info = regions.read_geo_info_file(given_path)
 
