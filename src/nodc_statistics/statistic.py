@@ -148,7 +148,7 @@ class DataHandler:
         for param in self._parameters:
             valid_data[param] = valid_data[param].where(
                 ~valid_data[f"Q_{param}"].isin(self._invalid_flags), np.nan
-            )  # noqa: E501
+            )
 
         return valid_data
 
@@ -435,7 +435,7 @@ def load_json(file_path):
 
 
 def create_sharktoolbox_json_from_directory(data_directory):
-    get_stb_basin_names = {str(no): f"TYPOMR_KOD_{str(no)}" for no in range(25)}
+    get_stb_basin_names = {str(no): f"TYPOMR_KOD_{no!s}" for no in range(25)}
     # Add the special cases for 1 and 12 with 's' and 'n'
     for base_no in [1, 12]:
         get_stb_basin_names[f"{base_no}s"] = f"TYPOMR_KOD_{base_no}s"
@@ -498,7 +498,7 @@ def create_sharktoolbox_json_from_directory(data_directory):
                 param: group[param]
                 .where(pd.notna(group[param]), None)
                 .tolist()  # Convert to list
-                for param in param_names + ["DEPH_intrp"]
+                for param in [*param_names, "DEPH_intrp"]
             }
 
         config_data[get_stb_basin_names.get(sea_area, sea_area)] = {"profile": profile}
