@@ -1,5 +1,6 @@
 import time
 from pathlib import Path
+from typing import Optional, Sequence, Tuple
 
 import geopandas as gpd
 import pandas as pd
@@ -17,36 +18,76 @@ AREA_TAG_FILE = (
 GPKG_FILE = Path.home() / "SVAR2022_HELCOM_OSPAR_vs2.gpkg"
 
 
-# @functools.cache
-# cache needs all argumetns to be hashable, GeoDataFrame is not
-def sea_basin_for_position(longitude, latitude, geo_info=None):
-    if not all((-180 <= longitude <= 180, -90 <= latitude <= 90)):
-        return None
-    point = pd.DataFrame({"LONGI_DD": [longitude], "LATIT_DD": [latitude]})
-    if not isinstance(geo_info, gpd.GeoDataFrame) and GPKG_FILE.exists:
-        print("reading geopackage in regions.sea_basin_for_position")
+def sea_basins_for_positions(
+    positions: Sequence[Tuple[float, float]], geo_info: Optional[gpd.GeoDataFrame] = None
+) -> dict[str, list]:
+    """
+    Assign sea basin (area_tag) for a list of positions.
+
+    Parameters
+    ----------
+    positions : list of (lon, lat) tuples
+    geo_info : GeoDataFrame with polygons (must contain "area_tag" column).
+               If None, falls back to text file lookup.
+
+    Returns
+    -------
+    dict with keys: "LONGI_DD", "LATIT_DD", "sea_basin"
+    """
+    longis, latits, basins = [], [], []
+
+    # validate positions
+    valid_positions = [
+        (lon, lat) for lon, lat in positions if -180 <= lon <= 180 and -90 <= lat <= 90
+    ]
+    if not valid_positions:
+        return {"LONGI_DD": [], "LATIT_DD": [], "sea_basin": []}
+
+    df = pd.DataFrame(valid_positions, columns=["LONGI_DD", "LATIT_DD"])
+
+    # load geo_info if missing
+    if not isinstance(geo_info, gpd.GeoDataFrame) and GPKG_FILE.exists():
         geo_info = read_geo_info_file(GPKG_FILE)
 
     if isinstance(geo_info, gpd.GeoDataFrame):
-        area_tag_df = get_area_tags(df=point, geo_info=geo_info)
-        if len(area_tag_df["area_tag"].values) > 1:
-            print(f'too many area_tag results {area_tag_df["area_tag"]}')
-        value = area_tag_df["area_tag"].values[0] or None
+        points = gpd.GeoDataFrame(
+            df,
+            geometry=gpd.points_from_xy(df["LONGI_DD"], df["LATIT_DD"]),
+            crs="EPSG:4326",
+        )
+        if geo_info.crs != points.crs:
+            points = points.to_crs(geo_info.crs)
+
+        joined = gpd.sjoin(points, geo_info, how="left", predicate="within")
+
+        longis = joined["LONGI_DD"].tolist()
+        latits = joined["LATIT_DD"].tolist()
+        basins = joined["area_tag"].where(~joined["area_tag"].isna(), None).tolist()
+
     else:
-        print("no geo_info, using area_tag textfile instead")
-        area_tag_df = pd.read_csv(AREA_TAG_FILE, sep="\t", encoding="utf-8")
-        # Create pos_string from input coordinates
-        pos_string = f"{longitude}_{latitude}"
+        # fallback textfile lookup
+        area_tag_df = pd.read_csv(AREA_TAG_FILE, sep="\t", encoding="utf-8").set_index(
+            "pos_string"
+        )
+        pos_strings = [f"{lon}_{lat}" for lon, lat in valid_positions]
+        matches = area_tag_df.reindex(pos_strings)["area_tag"]
 
-        # Look for a match in the DataFrame
-        match = area_tag_df.loc[area_tag_df["pos_string"] == pos_string, "area_tag"]
+        longis = [lon for lon, _ in valid_positions]
+        latits = [lat for _, lat in valid_positions]
+        basins = [val if pd.notna(val) else None for val in matches.tolist()]
 
-        # Return the matched area_tag or None
-        value = match.iloc[0] if not match.empty else None
-        if value is None:
-            print(f"no information for longitude: {longitude}, latitude: {latitude}")
+    return {"LONGI_DD": longis, "LATIT_DD": latits, "sea_basin": basins}
 
-    return value if not pd.isna(value) else None
+
+def sea_basin_for_position(
+    longitude: float, latitude: float, geo_info: Optional[gpd.GeoDataFrame] = None
+) -> Optional[str]:
+    seabasin = sea_basins_for_positions([(longitude, latitude)], geo_info=geo_info).get(
+        "sea_basin", []
+    )
+    if not seabasin:  # empty list check
+        return None
+    return seabasin[0]
 
 
 def read_geo_info_file(filepath: Path):
@@ -74,61 +115,17 @@ def read_geo_info_file(filepath: Path):
     return geo_info
 
 
-def get_area_tags(df, geo_info: gpd.GeoDataFrame):
-    """
-    Hitta rätt "area_tag" för varje punkt i DataFrame df genom en rumslig join med
-    geo_info.
-    Returnera en DataFrame med kolumnerna "area_tag", "LONGI_DD" och "LATIT_DD".
-    """
-    # Skapa en geopandas GeoDataFrame med punkter från df
-    points = gpd.GeoDataFrame(
-        geometry=gpd.points_from_xy(df["LONGI_DD"], df["LATIT_DD"]), crs="EPSG:4326"
-    )
-
-    # Kontrollera om CRS för geo_info matchar punkternas CRS
-    if geo_info.crs != points.crs:
-        # Transformera punkternas CRS till matchande CRS
-        points = points.to_crs(geo_info.crs)
-
-    # Använd geopandas sjoin för att göra en rumslig join mellan punkterna och polygonerna
-    # i geo_info. Med inner kommer endast de punkter som har en match i geo_info med
-    joined = gpd.sjoin(points, geo_info, how="inner", predicate="within")
-
-    # Lägg till "LONGI_DD" och "LATIT_DD" från points till joined
-    joined["LONGI_DD"] = df["LONGI_DD"]
-    joined["LATIT_DD"] = df["LATIT_DD"]
-
-    # Kontrollera om det finns flera matchningar för samma punkt
-    duplicate_check = (
-        joined.groupby(["LONGI_DD", "LATIT_DD"])
-        .agg(
-            count_areatags=("area_tag", pd.Series.nunique),
-            unique_areatags=("area_tag", "unique"),
-        )
-        .reset_index()
-    )
-    multiple_matches = duplicate_check[duplicate_check["count_areatags"] > 1]
-
-    if not multiple_matches.empty:
-        print("Varning: Följande punkter har flera matchande polygoner:")
-        print(multiple_matches)
-        raise ValueError("punkt matchar mot flera områden")
-        # Hantera flera matchningar, t.ex. genom att välja den första matchningen
-        joined = joined.drop_duplicates(subset=["LONGI_DD", "LATIT_DD"], keep="first")
-
-    # Välj önskade kolumner och returnera som en DataFrame
-    if not joined.empty:
-        result_df = joined[["area_tag", "LONGI_DD", "LATIT_DD"]].copy()
-        return result_df
-    else:
-        # Om inga matchningar hittades, returnera en tom DataFrame med rätt kolumner
-        return pd.DataFrame(columns=["area_tag", "LONGI_DD", "LATIT_DD"])
-
-
 def update_area_tag_file(coordinates_filepath):
     data = pd.read_csv(coordinates_filepath, sep=",", encoding="utf8")
     geo_info = read_geo_info_file(Path.home() / "SVAR2022_HELCOM_OSPAR_vs2.gpkg")  # noqa: E501
-    area_tags = get_area_tags(df=data, geo_info=geo_info)
+    # Call new dict-returning API
+    result = sea_basins_for_positions(
+        positions=list(zip(data["LONGI_DD"], data["LATIT_DD"])), geo_info=geo_info
+    )
+
+    # Convert dict → pandas (or polars, depending on context)
+    area_tags = pd.DataFrame(result)
+
     area_tags.drop_duplicates(inplace=True)
     area_tags["pos_string"] = (
         area_tags["LONGI_DD"].astype(str) + "_" + area_tags["LATIT_DD"].astype(str)
