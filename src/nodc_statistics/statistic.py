@@ -13,7 +13,11 @@ from nodc_calculations.calculate import (
 )
 
 from nodc_statistics.calculate_parameter import get_prio_par
-from nodc_statistics.regions import read_geo_info_file, sea_basin_for_position
+from nodc_statistics.regions import (
+    read_geo_info_file,
+    sea_basin_for_position,
+    sea_basins_for_positions,
+)
 
 statistics_directory = Path(__file__).parent / "data" / "statistics"
 STATISTIC_FILES = {
@@ -90,12 +94,25 @@ class DataHandler:
     self.data contaings a pandas dataframe with the data
     """
 
-    def __init__(self, data_path):
+    def __init__(self, data_path, end_year: int, start_year: int):
         super().__init__()
+
         with SETTING_FILE["settings"].open("r", encoding="utf-8") as file:
             self.settings = json.load(file)
         self.data = self._read_shark_data(data_path)
+        # filter data to only use from the given period
+        if start_year:
+            self.data = self.data[self.data["year"].between(start_year, end_year)]
+
+        # remove unsuable data where depth is unkown
+        self.data = self.data[self.data["DEPH"] != 999]
+
+        # clean secchi column that can sometimes contain < and not clean float
+        self._clean_secchi_column()
+
+        # set default invalid flags
         self._invalid_flags = {"S", "B", "E", 3, 4}
+
         # Extract parameter column names by finding columns with matching 'Q_' prefix
         quality_flag_columns = [col for col in self.data.columns if col.startswith("Q_")]
         for col in quality_flag_columns:
@@ -104,14 +121,27 @@ class DataHandler:
         self._parameters = [
             col[2:] for col in quality_flag_columns if col[2:] in self.data.columns
         ]
-        self._valid_data = None
-        self._match_sea_basins()
+
+        # add information about sea basin to dataframe
+        self._geo_info = read_geo_info_file(filepath=GPKG_FILE)
+        results = sea_basins_for_positions(
+            positions=self.data[["LONGI_DD", "LATIT_DD"]].itertuples(
+                index=False, name=None
+            ),
+            geo_info=self._geo_info,
+        )
+        # Merge results back into self.data
+        basins_df = pd.DataFrame(results)
+        self.data = self.data.merge(basins_df, on=["LONGI_DD", "LATIT_DD"], how="left")
+
         # Convert standard_depths to depth_intervals
         depth_intervals = {
             key: create_depth_bins(values)
             for key, values in self.settings["standard_depths"].items()
         }
         self.data = self.assign_depth_intervals(self.data, depth_intervals)
+
+        # Add calculated parameters
         self._add_parameters(self.data)
 
     def _read_shark_data(self, filepath: str):
@@ -124,6 +154,46 @@ class DataHandler:
         df["year"] = df["timestamp"].apply(lambda x: x.year)
 
         return df
+
+    def _clean_secchi_column(self) -> None:
+        """Clean and convert the SECCHI column, logging problematic entries."""
+
+        # Try converting to numeric; mark rows that fail
+        mask_invalid = (
+            pd.to_numeric(self.data["SECCHI"], errors="coerce").isna()
+            & self.data["SECCHI"].notna()
+        )
+
+        if mask_invalid.any():
+            print("Problematic values that can't be converted:")
+            print(self.data.loc[mask_invalid, "SECCHI"].unique())
+
+            print("\nFull rows with problematic values:")
+            print(
+                self.data.loc[mask_invalid][["SECCHI", "Q_SECCHI", "timestamp", "STATN"]]
+            )
+
+        print(self.data["SECCHI"].apply(type).value_counts())
+
+        # Show unique string values only
+        string_values = self.data[
+            self.data["SECCHI"].apply(lambda x: isinstance(x, str))
+        ]["SECCHI"].unique()
+        print("String values in the column:", string_values)
+
+        # Inspect unique string entries
+        string_rows = self.data.loc[
+            self.data["SECCHI"].apply(lambda x: isinstance(x, str)),
+            ["SECCHI", "timestamp", "STATN"],
+        ]
+        for val in string_rows["SECCHI"].unique():
+            print(repr(val))
+
+        unique_string_entries = string_rows.drop_duplicates().sort_values(by="SECCHI")
+        print(unique_string_entries)
+
+        # Final conversion
+        self.data["SECCHI"] = pd.to_numeric(self.data["SECCHI"], errors="coerce")
 
     @property
     def invalid_flags(self):
@@ -153,7 +223,7 @@ class DataHandler:
         return valid_data
 
     def _add_parameters(self, data):
-        df = oxygen(data)
+        data["oxygen"] = oxygen(data)
         data.loc[:, "salt"] = data.apply(
             lambda row: get_prio_par(
                 row.SALT_CTD, row.SALT_BTL, row.Q_SALT_CTD, row.Q_SALT_BTL
@@ -167,35 +237,13 @@ class DataHandler:
             axis=1,
         )
 
-        data["doxy"] = df["oxygen"].copy()
-        data["Q_doxy"] = df["Q_DOXY_BTL"].copy()
+        data["doxy"] = data["oxygen"].copy()
+        data["Q_doxy"] = data["Q_DOXY_BTL"].copy()
 
         dissolved_inorganic_nitrogen(data)
 
         _, _, o2sat_data = oxygen_saturation(data)
-        print(o2sat_data.head())
-        data["oxygen_saturation"] = o2sat_data["oxygen_saturation"].copy()
-
-    def _match_sea_basins(self):
-        self._geo_info = read_geo_info_file(filepath=GPKG_FILE)
-
-        print("Matching sea basins...")
-        # Assuming df is your DataFrame and sea_basin_for_position is the function
-        # to apply
-        # Step 1: Extract unique combinations of LONGI and LATIT
-        unique_positions = self.data.copy()[["LONGI_DD", "LATIT_DD"]].drop_duplicates()
-        # Step 2: Apply the function to each unique combination
-        unique_positions["sea_basin"] = unique_positions.apply(
-            lambda row: sea_basin_for_position(
-                row["LONGI_DD"], row["LATIT_DD"], self._geo_info
-            ),
-            axis=1,
-        )
-        # Step 3: Map the results back to the original DataFrame
-        self.data = self.data.merge(
-            unique_positions, on=["LONGI_DD", "LATIT_DD"], how="left"
-        )
-        print("Matching sea basins finished")
+        data["oxygen_saturation"] = o2sat_data
 
     def assign_depth_intervals(
         self, data: pd.DataFrame, depth_intervals: dict
@@ -259,6 +307,44 @@ class CalculateStatistics:
 
         return grouped
 
+    def _spike_check(self, profile):
+        """
+        Perform spike detection on a single profile sorted by depth.
+        Spikes defined as:
+        delta = |alfa - beta|
+        alfa = V2 - |(V3+V1)/2|
+        beta = |(V3-V1)/2|
+        This assumes values (V) are evenly spread over depth
+        To correct for this we define the scaling factor which for evenly spread data is 1/2
+        scaling factor = |(D2 - D1) / (D3 - D1)|
+        """  # noqa: E501
+
+        profile = profile.sort_values(by="DEPH").reset_index(drop=True)
+        vals = profile["value"].values
+        dephs = profile["DEPH"].values
+
+        deltas = np.full(len(profile), np.nan, dtype=float)
+        scaling_factor = 0.5
+
+        if len(vals) > 2:
+            scaling_factor = np.abs((dephs[1:-1] - dephs[:-2]) / (dephs[2:] - dephs[:-2]))
+            alfa = np.abs(vals[1:-1] - (vals[:-2] + vals[2:]) * scaling_factor)
+            beta = np.abs((vals[2:] - vals[:-2]) * scaling_factor)
+            delta = np.abs(alfa - beta)
+            deltas[1:-1] = delta
+
+        return deltas
+
+    def spike_stat(self):
+        visit_columns = ["STATN", "year", "month", "day", "sea_basin"]
+        for visit, group in data.groupby(visit_columns, group_keys=False):
+            for parameter in self._parameters:
+                param_spike_col = f"{parameter}_spike"  # New column name
+                profile = group[[parameter, "DEPH"]].rename(columns={parameter: "value"})
+                group[param_spike_col] = self._spike_check(profile)  # Assign spike values
+                # Merge back into the original DataFrame
+                data.loc[group.index, param_spike_col] = group[param_spike_col]
+
     def profile_statistics(self, save=True):
         """
         Calculate statistics for standard depths by month and sea basin
@@ -271,8 +357,15 @@ class CalculateStatistics:
             "count": "count",
             "max": "max",
             "min": "min",
-            "95p": lambda x: np.percentile(x, 95),
-            "5p": lambda x: np.percentile(x, 5),
+            "median": "median",
+            "95p": lambda x: np.nanpercentile(x, 95),
+            "5p": lambda x: np.nanpercentile(x, 5),
+            "99p": lambda x: np.nanpercentile(x, 99),
+            "1p": lambda x: np.nanpercentile(x, 1),
+            "25p": lambda x: np.nanpercentile(x, 25),
+            "75p": lambda x: np.nanpercentile(x, 75),
+            "mad": lambda x: np.nanmedian(np.abs(x - np.nanmedian(x))),
+            "smad": lambda x: 1.4826 * np.nanmedian(np.abs(x - np.nanmedian(x))),
         }
 
         # Definiera kolumner att gruppera på
@@ -339,7 +432,8 @@ class CalculateStatistics:
             file_name = f"{clean_area_tag}.{file_format}"
             # Spara gruppen till en fil
             group.to_csv(
-                Path(__file__).parent / "data/statistics" / file_name, **SAVE_KWARGS
+                Path(__file__).parent / "data/statistics_1990-2023" / file_name,
+                **SAVE_KWARGS,
             )
 
 
@@ -684,15 +778,191 @@ def plot_comparison(original_data, new_data, sea_basin, months):
         plt.close(fig)  # Close the figure to free memory
 
 
+def plot_profiles_tukey_bounds(statistics_directory: Path):
+    parameters = [
+        "salt",
+        "temp",
+        "doxy",
+        "PHOS",
+        "NTRA",
+        "AMON",
+        "SIO3-SI",
+        "PH",
+        "ALKY",
+        "HUMUS",
+        "PTOT",
+        "NTOT",
+    ]
+
+    # Loop through all .csv files in the directory
+    for stat_file in statistics_directory.glob("*.csv"):
+        sea_basin = stat_file.stem
+        data = pd.read_csv(stat_file, sep="\t", encoding="utf-8")
+
+        # Iterate over the parameters and create plots
+        for month in data["month"].unique():
+            month_data = data[data["month"] == month].copy()
+            fig, axs = plt.subplots(2, 6, figsize=(11.69, 8.27))
+            axs = axs.flatten()
+            for i, param in enumerate(parameters):
+                if i >= len(axs):
+                    break  # Prevent index error if more than 6 parameters
+
+                # Check if all required columns exist
+                col_median = f"{param}:median"
+                col_min = f"{param}:min"
+                col_max = f"{param}:max"
+                col_25p = f"{param}:25p"
+                col_75p = f"{param}:75p"
+                col_5p = f"{param}:5p"
+                col_95p = f"{param}:95p"
+                col_1p = f"{param}:1p"
+                col_99p = f"{param}:99p"
+                if all(
+                    col in month_data.columns for col in [col_median, col_25p, col_75p]
+                ):
+                    depth = month_data["depth"]
+                    median = month_data[col_median]
+                    q1 = month_data[col_25p]
+                    q3 = month_data[col_75p]
+
+                    # iqr = q3 - q1
+                    iqr_low = median - q1
+                    iqr_high = q3 - median
+                    flag1_lower = month_data[col_1p]  # good down 1 percentile
+                    flag1_upper = month_data[col_99p]  # good up 99 percentile
+                    flag3_lower = (
+                        month_data[col_min] - iqr_low
+                    )  # correctable between 1 percentile and min - iqr_low,
+                    # all BELOW min will be flag 4 (bad)
+                    flag3_upper = (
+                        month_data[col_max] + iqr_high
+                    )  # correctable between 991 percentile and max + iqr_high,
+                    # all ABOVE will be flag 4 (bad)
+                    # clip lower flags:
+                    if "temp" in param.lower():
+                        flag1_lower = flag1_lower.clip(lower=-2)
+                        # flag2_lower = flag2_lower.clip(lower=-2)
+                        flag3_lower = flag3_lower.clip(lower=-2)
+                    else:
+                        flag1_lower = flag1_lower.clip(lower=0)
+                        # flag2_lower = flag2_lower.clip(lower=0)
+                        flag3_lower = flag3_lower.clip(lower=0)
+                else:
+                    print(
+                        f"missing statistics for {param} in {sea_basin} in {datetime.date(2000, month , 1).strftime('%B')}"  # noqa: E501
+                    )
+                    continue
+                ax = axs[i]
+                ax.plot(
+                    month_data[[col_median]],
+                    depth,
+                    color="black",
+                    linestyle="-",
+                    label="median/min/max",
+                    linewidth=1,
+                )
+                ax.plot(
+                    month_data[[col_min, col_max]],
+                    depth,
+                    color="black",
+                    linestyle="--",
+                    label="median/min/max",
+                    linewidth=1,
+                )
+                ax.plot(
+                    month_data[[col_1p, col_5p, col_95p, col_99p]],
+                    depth,
+                    color="grey",
+                    linestyle=":",
+                    label="1, 5, 95, 99 perc",
+                    linewidth=1,
+                )
+                ax.fill_betweenx(
+                    depth,
+                    flag1_lower,
+                    flag1_upper,
+                    color="green",
+                    label="good 1-99 perc",
+                    alpha=0.3,
+                )
+                ax.fill_betweenx(
+                    depth,
+                    flag3_lower,
+                    flag1_lower,
+                    label="bad data correctable\n1p to min-iqr_low and 99 to max+iqr_high",  # noqa: E501
+                    color="orange",
+                    alpha=0.3,
+                )
+                ax.fill_betweenx(
+                    depth,
+                    flag1_upper,
+                    flag3_upper,
+                    label="bad data correctable\n1p to min-iqr_low and 99 to max+iqr_high",  # noqa: E501
+                    color="orange",
+                    alpha=0.3,
+                )
+
+                ax.set_title(f"{param}")
+                ax.set_ylabel("Depth (m)")
+                ax.set_xlabel(param)
+                # Collect handles and labels
+                # handles, labels = ax.get_legend_handles_labels()
+                # # Remove duplicates while preserving order
+                # seen = set()
+                # unique = [
+                #     (h, l)
+                #     for h, l in zip(handles, labels)
+                #     if not (l in seen or seen.add(l))
+                # ]
+                # # Apply deduplicated legend
+                # ax.legend(*zip(*unique))
+                ax.yaxis.set_inverted(True)
+            # Collect legend info from the first axis only
+            handles, labels = axs[0].get_legend_handles_labels()
+
+            # Deduplicate while preserving order
+            seen = set()
+            unique = [
+                (h, lbl)
+                for h, lbl in zip(handles, labels)
+                if not (lbl in seen or seen.add(lbl))
+            ]
+            fig.suptitle(
+                f"{SVAR2022_basin_names.get(sea_basin, sea_basin)} - Month {month}"
+            )
+            fig.legend(
+                *zip(*unique),
+                loc="upper center",
+                bbox_to_anchor=(0.5, 0.92),
+                ncol=len(unique),
+            )
+
+            # Adjust layout for better spacing
+            plt.tight_layout()
+            # Save the figure as a PNG file (one plot per sea_basin and month)
+            save_path = (
+                Path("..")
+                / "../figures/percentiles_1993-2023"
+                / f"{SVAR2022_basin_names.get(sea_basin, sea_basin)}_month_{month}_comparison.png"  # noqa: E501
+            )
+            fig.savefig(save_path, dpi=300)
+            plt.close(fig)  # Close the figure to free memory
+
+
 if __name__ == "__main__":
+    plot_profiles_tukey_bounds(Path("src/nodc_statistics/data/statistics_1990-2023"))
+    exit()
     ## create profile statistics ###
-    data = DataHandler("C:/LenaV/code/data/sharkweb_data_1991-2020_for_statistics.txt")
+    # "C:/LenaV/code/data/sharkweb_data_1991-2020_for_statistics.txt
+    path = Path("C:/LenaV/code/data/sharkweb_data_1990-2024_for_statistics.txt")
+    data = DataHandler(path, start_year=1993, end_year=2023)
 
     valid_data = data.valid_data
 
     statistics = CalculateStatistics(valid_data)
     statistics.profile_statistics()
-
+    exit()
     ## return statisitics
     get_profile_statistics_for_parameter_and_position(
         "TEMP_CTD", 10.759, 58.3050, datetime.datetime(2024, 5, 16)
