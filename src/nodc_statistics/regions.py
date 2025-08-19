@@ -105,7 +105,7 @@ def read_geo_info_file(filepath: Path):
         t0 = time.perf_counter()
         gdf = gpd.read_file(file_path, layer=layer)
         t1 = time.perf_counter()
-        print(f"Read file took ({t1-t0:.3f} .s)")
+        print(f"Read file took ({t1 - t0:.3f} .s)")
         gdf = gdf.rename(columns={area_tag: "area_tag"})
         layers.append(gdf)
 
@@ -117,7 +117,7 @@ def read_geo_info_file(filepath: Path):
 
 def update_area_tag_file(coordinates_filepath):
     data = pd.read_csv(coordinates_filepath, sep=",", encoding="utf8")
-    geo_info = read_geo_info_file(Path.home() / "SVAR2022_HELCOM_OSPAR_vs2.gpkg")  # noqa: E501
+    geo_info = read_geo_info_file(Path.home() / "SVAR2022_HELCOM_OSPAR_vs2.gpkg")
     # Call new dict-returning API
     result = sea_basins_for_positions(
         positions=list(zip(data["LONGI_DD"], data["LATIT_DD"])), geo_info=geo_info

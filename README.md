@@ -10,14 +10,14 @@ För att linta och formatera koden används `ruff`.
 Linta koden med följande kommando:
 
 ```bash
-$ ruff check
+$ uv run ruff check
 ```
 
 Kontrollerar att koden uppfyller konfigurerade linting-regler. Konfigurationen finns i `pyproject.yaml` under sektionen
 `[tool.ruff.lint]`. Vissa identifierade problem kan `ruff` åtgärda själv. Detta görs med flaggan `--fix`.
 
 ```bash
-$ ruff check --fix
+$ uv run ruff check --fix
 ```
 
 Information om alla regler finns här:
@@ -29,7 +29,7 @@ Information om alla regler finns här:
 Formatera koden med följande kommando:
 
 ```bash
-$ ruff format
+$ uv run ruff format
 ```
 
 ## pre-commit
@@ -37,7 +37,7 @@ För att hantera pre-commit-hook för git används verktyget `pre-commit`. Verkt
 dev-dependencies men för att aktivera det behöver man skriva följande kommando:
 
 ```bash
-$ pre-commit install
+$ uv run pre-commit install
 ```
 
 Efter aktivering kommer en commit att avbrytas om inte en serie av kontroller går igenom. Vilka kontroller som ingår
