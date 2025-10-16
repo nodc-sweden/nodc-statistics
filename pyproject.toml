@@ -1,6 +1,6 @@
 [project]
 name = "nodc-statistics"
-version = "2025.1.0"
+version = "2025.1.1"
 description = "Statistics for NODC"
 authors = [
     {name = "Jonatan Skogsfors", email = "jonatan.skogsfors@smhi.se"},
