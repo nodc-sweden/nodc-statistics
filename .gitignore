@@ -16,3 +16,4 @@
 .pdm.toml
 .pdm-python
 .pdm-build/
+src/nodc_statistics/data/statistics_*

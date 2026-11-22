@@ -1,11 +1,13 @@
 import datetime
 import functools
 import json
+import time
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import polars as pl
 from nodc_calculations.calculate import (
     dissolved_inorganic_nitrogen,
     oxygen,
@@ -123,26 +125,43 @@ class DataHandler:
         ]
 
         # add information about sea basin to dataframe
+        # Step 0: read geopackage (OSPAR, HELCOM, SVAR)
         self._geo_info = read_geo_info_file(filepath=GPKG_FILE)
-        results = sea_basins_for_positions(
-            positions=self.data[["LONGI_DD", "LATIT_DD"]].itertuples(
-                index=False, name=None
-            ),
-            geo_info=self._geo_info,
+        pl_data = pl.from_pandas(self.data)
+
+        t0 = time.perf_counter()
+        # Step 1: Extract unique positions and create decimal degree columns
+        positions_dd_pl = pl_data.select(["LONGI_DD", "LATIT_DD"]).unique()
+
+        # Step 2: Call the bulk function
+        positions_dd = [
+            (lon, lat)
+            for lon, lat in positions_dd_pl.select(["LONGI_DD", "LATIT_DD"]).to_numpy()
+        ]
+        basins_dict = sea_basins_for_positions(positions_dd, geo_info=self._geo_info)
+        basins_pl = pl.DataFrame(basins_dict)
+
+        # Step 3: Join the sea_basins back to the unique positions, drop DD columns
+        positions_with_basins = positions_dd_pl.join(
+            basins_pl, on=["LONGI_DD", "LATIT_DD"], how="left"
         )
-        # Merge results back into self.data
-        basins_df = pd.DataFrame(results)
-        self.data = self.data.merge(basins_df, on=["LONGI_DD", "LATIT_DD"], how="left")
+
+        # Step 4: Join back to the original data
+        pl_data_with_sea_basins = pl_data.join(
+            positions_with_basins,
+            on=["LONGI_DD", "LATIT_DD"],
+            how="left",
+        )
+        pd_data = pl_data_with_sea_basins.to_pandas()
+        t1 = time.perf_counter()
+        print(f"Matching sea basins finished ({t1 - t0:.3f} s.)")
 
         # Convert standard_depths to depth_intervals
         depth_intervals = {
             key: create_depth_bins(values)
             for key, values in self.settings["standard_depths"].items()
         }
-        self.data = self.assign_depth_intervals(self.data, depth_intervals)
-
-        # Add calculated parameters
-        self._add_parameters(self.data)
+        self.data = self.assign_depth_intervals(pd_data, depth_intervals)
 
     def _read_shark_data(self, filepath: str):
         """read text file from sharkweb"""
@@ -288,7 +307,15 @@ class CalculateStatistics:
         self.data = data
         with SETTING_FILE["settings"].open("r", encoding="utf-8") as file:
             self.settings = json.load(file)
-
+        not_available_parameters = {
+            parameter
+            for parameter in self.settings["statistic_parameters"]
+            if parameter not in self.data.columns
+        }
+        print(f"{not_available_parameters=}")
+        self.settings["statistic_parameters"] = list(
+            set(self.settings["statistic_parameters"]) - not_available_parameters
+        )
         # aggregera alla data på station, djup, år, månad
         self.agg_data = self._agg_station_data()
 
@@ -350,6 +377,7 @@ class CalculateStatistics:
         Calculate statistics for standard depths by month and sea basin
         Saves results to statistic library
         """
+        year_interval = self.agg_data["year"].agg(["min", "max"]).tolist()
         # Definiera aggregeringsfunktioner och deras namn
         agg_funcs = {
             "mean": "mean",
@@ -417,12 +445,20 @@ class CalculateStatistics:
 
         # Check if the DataFrame is empty before saving
         if save and not grouped.empty:
-            self._save_statistic_files(grouped)
+            print("save statistics to files")
+            self._save_statistic_files(grouped, year_interval=year_interval)
 
-    def _save_statistic_files(self, data, column_name="sea_basin", file_format="csv"):
+    def _save_statistic_files(
+        self, data, year_interval, column_name="sea_basin", file_format="csv"
+    ):
         # Grupper DataFrame efter `area_tag`
         grouped = data.groupby(column_name)
-
+        output_path = (
+            Path(__file__).parent
+            / f"data/statistics_{year_interval[0]}-{year_interval[-1]}"
+        )
+        Path(output_path).mkdir(exist_ok=True)
+        print(f"save files in directory {output_path}")
         # Spara varje grupp i en separat fil
         for area_tag, group in grouped:
             # Skapa ett filnamn baserat på area_tag
@@ -432,7 +468,7 @@ class CalculateStatistics:
             file_name = f"{clean_area_tag}.{file_format}"
             # Spara gruppen till en fil
             group.to_csv(
-                Path(__file__).parent / "data/statistics_1990-2023" / file_name,
+                output_path / file_name,
                 **SAVE_KWARGS,
             )
 
@@ -951,12 +987,12 @@ def plot_profiles_tukey_bounds(statistics_directory: Path):
 
 
 if __name__ == "__main__":
-    plot_profiles_tukey_bounds(Path("src/nodc_statistics/data/statistics_1990-2023"))
-    exit()
+    # plot_profiles_tukey_bounds(Path("src/nodc_statistics/data/statistics_1990-2023"))
+
     ## create profile statistics ###
     # "C:/LenaV/code/data/sharkweb_data_1991-2020_for_statistics.txt
     path = Path("C:/LenaV/code/data/sharkweb_data_1990-2024_for_statistics.txt")
-    data = DataHandler(path, start_year=1993, end_year=2023)
+    data = DataHandler(path, start_year=1991, end_year=2020)
 
     valid_data = data.valid_data
 
